@@ -37,6 +37,7 @@ class TaskDetailEditor(tk.LabelFrame):
         self.timestamp = ""
         ## Reference to the Database entry currently loaded into the editor
         self.d1 = None
+        self.run = 0
 
         # Bind events for all controls
         self.task_detail.bind("<KeyRelease>", self._on_change)
@@ -190,7 +191,7 @@ class TaskDetailEditor(tk.LabelFrame):
 
     def set_end_time(self, timestamp):
         #print("set_end_time")
-        self.timestamp = timestamp # remember for return path
+        #self.timestamp = timestamp # remember for return path
         # Extract hour and minute from the timestamp
         h = timestamp[8:10]
         m = timestamp[10:12]
@@ -198,6 +199,20 @@ class TaskDetailEditor(tk.LabelFrame):
         self.end_hour.insert(0, h)
         self.end_minute.delete(0, "end")
         self.end_minute.insert(0, m)
+
+    def run_clock(self):
+        self.run = 1
+        self.update_time()
+    def stop_clock(self):
+        self.run = 0
+    def update_time(self):
+        """ Updates the spinbox to show the current system time. """
+        # run set_end_time automatically for a started task
+        self.set_end_time(datetime.now().strftime("%Y%m%d%H%M%S"))
+
+        # Schedule the next update after 60 seconds
+        if self.run:
+            self.after(60000, self.update_time)
 
 # Example Usage
 if __name__ == "__main__":
