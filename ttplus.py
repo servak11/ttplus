@@ -148,7 +148,7 @@ from datetime import datetime
 
 from mod_table import TableWidget
 import const
-from mod_table_v2 import db_field_shortnames
+
 from mod_db import Database
 
 from mod_detaileditor import TaskDetailEditor
@@ -399,25 +399,34 @@ def update_task_details(d_new_details):
     # TODO no need to check selected_item,
     # it is only possible to land here if it was selected
     #if selected_item:
-        
+
     # find index of current note in the database
     task_id = table1.item(table1.selection(), "values")[0]
     detail_index = table2.index(selected_item[0])
 
-    detail_list = database["task_details"].get(task_id) #[detail_index]
-    
+    detail_list = database["task_details"].get(task_id)
+
     if(detail_index >= len(detail_list)):
-        print("!",detail_list.__class__,"detail_list contains", len(detail_list), "details, but selected item", (detail_index+1) )
+        ### ADD new detail entry to the database
+        # this is the last entry, which is always the placeholder
+        #print("!",detail_list.__class__,"detail_list contains", len(detail_list), "details, but selected item", (detail_index+1) )
         #print("Placeholder Modified!")
-        # now need create new database entry
+        #
         # Attention d_new_details contains only modified details, 
         # therefore we need to use tde.get_data() to obtain full details and add it to database
+        # The database entry was already created for the details in the TDE
+        # when the on_table2_select() was triggered, just take that data back!
         detail_list.append(tde.get_data())
+
         # Voila! Now add new placeholder
         add_new_detail_placeholder()
-        detail_list_check = database["task_details"].get(task_id) #[detail_index]
+
+        # Below test the full details must be now good in the database
+        #detail_list_check = database["task_details"].get(task_id) #[detail_index]
         #print(detail_list_check.__class__,"detail_list_check now contains", len(detail_list_check), "details" )
     else:
+        ### UPDATE existing detail entry into the database
+        # was already done in the TDE because the entry was referenced there (see self.d1)
         #print("+",detail_list.__class__,"detail_list contains", len(detail_list), "details, selected item", (detail_index+1) )
         pass
 
@@ -440,45 +449,11 @@ def update_task_details(d_new_details):
         str(tde.d1["What was done"])
         
     )
-    table2.item(selected_item, values=l, tags=("blue",))
-
+    ### UPDATE existing detail entry into the table view
     # because the values were updated directly in the database record provided by reference to the editor,
     # need only to update the values in the GUI table2
-    # TODO it seems easier just to update all values in the tablle
-    #values[const.TABLE_FIELD_DETAIL] = new_detail
-    #if(d_new_details[])
-    #table2.item(selected_item, values=values, tags=("blue",))
-
-    #if values[const.TABLE_FIELD_DETAIL] != new_detail:
-    if 0:
-        # update table view
-        values[const.TABLE_FIELD_DETAIL] = new_detail
-        table2.item(selected_item, values=values, tags=("blue",))
-
-        # this is the list of details for task task_id
-        l=database["task_details"].get(task_id)
-        #print("from",len(l),"item selected index",detail_index)
-
-        if (detail_index==len(l)): # editing placeholder
-            status("task",task_id,"has",len(l),"details")
-
-            ############### use placeholder
-            # placeholder is being edited, create detail entry
-            # use generate_task_id() function to obtain timestamp
-            d_entry = {
-                "Start Time": generate_task_id(),
-                "End Time": generate_task_id(),
-                "What was done": new_detail
-            }
-
-            # add new entry if new detail
-            l.append(d_entry)
-
-            # Save database and add new placeholder detail if necessary
-            add_new_detail_placeholder()
-            #db.save_data(database)
-        else:
-            l[detail_index]["What was done"] = new_detail
+    # it seems easier just to update all values in the tablle
+    table2.item(selected_item, values=l, tags=("blue",))
 
 # Delete the selected task from Table 1 and the database
 def delete_task():
@@ -498,6 +473,7 @@ def delete_task():
 
 # Handle selection in Table 1
 def on_table1_select(event):
+    tde.stop_clock()
     selected_item = table1.selection()
     # load for editing
     textfield_task_name.delete(0, tk.END)
@@ -514,6 +490,7 @@ def on_table1_select(event):
 
 # Handle selection in Table 2
 def on_table2_select(event):
+    tde.stop_clock()
     tde.clear_note()
     selected_item = table2.selection()
     if selected_item:
@@ -539,6 +516,7 @@ def on_table2_select(event):
                 "End Time": generate_task_id(),
                 "What was done": "add detail ..."
             }
+            tde.run_clock()
 
         tde.load_data( d_entry )
 
