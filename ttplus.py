@@ -150,7 +150,7 @@ from mod_table import TableWidget
 import const
 
 from mod_db import Database
-
+from mod_about import AboutDialog
 from mod_detaileditor import TaskDetailEditor
 
 # Task 1
@@ -524,6 +524,9 @@ def on_table2_select(event):
 def current_time():
     return datetime.now().strftime("%H:%M")
 
+def show_about():
+    AboutDialog(master=root)
+
 # === MAIN APPLICATION ===
 
 db = Database()
@@ -535,6 +538,14 @@ task_placeholder_id = "00000"
 info = (str(database["work_tasks"].__class__),"database contains",str(len(database["work_tasks"])),"records")
 status_bar = tk.Label(text = " ".join(info),relief=tk.SUNKEN, anchor="w")
 status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+
+# Create a menu bar
+menu_bar = tk.Menu(root)
+root.config(menu=menu_bar)
+
+# Add the "Help" menu
+help_menu = tk.Menu(menu_bar, tearoff=0)
+menu_bar.add_command(label="About", command=show_about)
 
 # Table 1 (Work Tasks)
 frame1 = ttk.LabelFrame(root, text="Work Tasks")
