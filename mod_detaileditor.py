@@ -21,6 +21,9 @@ import tkinter as tk
 from datetime import datetime
 from mod_timespin import TimeSpinControl
 
+import webbrowser
+import re
+
 class TaskDetailEditor(tk.LabelFrame):
     def __init__(self, master, **kwargs):
         # Create the LabelFrame
@@ -29,10 +32,10 @@ class TaskDetailEditor(tk.LabelFrame):
         self.pack(fill="both", expand=True, padx=5, pady=5)
 
         # First Line of Controls
-        self._create_first_line()
+        self._create_note_detail_head()
 
         # Second Line of Controls
-        self._create_second_line()
+        self._create_note_detail_editor()
         
         self.timestamp = ""
         ## Reference to the Database entry currently loaded into the editor
@@ -51,7 +54,7 @@ class TaskDetailEditor(tk.LabelFrame):
         self.end_minute.bind("<KeyRelease>", self._on_change)
         self.end_minute.bind("<ButtonRelease-1>", self._on_change)
 
-    def _create_first_line(self):
+    def _create_note_detail_head(self):
         first_line = tk.Frame(self)
         first_line.pack(fill="x", padx=5, pady=5)
 
@@ -73,19 +76,71 @@ class TaskDetailEditor(tk.LabelFrame):
         self.end_minute = TimeSpinControl(first_line, max_value=59)
         self.end_minute.pack(side="left", padx=5)
 
-        # Text field for task detail
+        # Text field for task detail name
         self.task_detail = tk.Entry(first_line, font=("Verdana", 12))
         self.task_detail.pack(side="left", fill="x", expand=True, padx=5)
         self.task_detail.insert(0, "Task Detail")
 
-    def _create_second_line(self):
+    def _create_note_detail_editor(self):
         second_line = tk.Frame(self)
         second_line.pack(fill="both", expand=True, padx=5, pady=5)
 
-        # Large text field for notes
-        self.notes = tk.Text(second_line, wrap="word", font=("Lucida Console", 11))
+        # Large text field for the task detail notes
+        self.notes = tk.Text(
+            second_line,
+            wrap="word",
+            font=("Lucida Console", 11),
+            undo=True
+        )
         self.notes.pack(fill="both", expand=True, padx=5, pady=5)
         self.notes.insert("1.0", "Notes about the task...")
+
+        # Bind Ctrl+Z for Undo
+        self.notes.bind("<Control-z>", self._undo_text)
+        # Bind Ctrl+Y for Redo (optional)
+        self.notes.bind("<Control-y>", self._redo_text)
+
+    def _undo_text(self, event=None):
+        """Undo last action in text editor"""
+        self.notes.edit_undo()
+        return "break"  # Prevent default event propagation
+
+    def _redo_text(self, event=None):
+        """Redo last undone action"""
+        self.notes.edit_redo()
+        return "break"
+
+    # callback installed by  _detect_and_tag_links(self)
+    # to open a link detected in the note detail
+    def _open_link(self,event):
+        tag_range = self.notes.tag_ranges("hyperlink")
+        if tag_range:
+            url = self.notes.get(tag_range[0], tag_range[1])
+            webbrowser.open(url)
+
+    # the text of the detail does not change when links are detected and tagged
+    # in a Tkinter Text widget. The actual string content remains untouched
+    # — the only modification is the visual formatting applied through tags
+    def _detect_and_tag_links(self):
+        content = self.notes.get("1.0", tk.END)
+        matches = re.finditer(r'https?://\S+', content)
+        count_links = 0
+        tg="none"
+        for match in matches:
+            count_links = count_links + 1
+            # get absolute position in the entire text
+            start_pos = match.start() 
+            end_pos = match.end()
+
+            # convert absolute position to Tkinter index (line.character)
+            tag_start = self.notes.index(f"1.0+{start_pos} chars")
+            tag_end = self.notes.index(f"1.0+{end_pos} chars")
+
+            tg="hyperlink"
+            self.notes.tag_add(tg, tag_start, tag_end)
+            self.notes.tag_configure(tg, foreground="blue", underline=True)
+            self.notes.tag_bind(tg, "<Button-1>", self._open_link)
+        print(f"Converted to {tg}: {count_links} links")
 
     def set_callback(self, update_task_details_method):
         self.callback = update_task_details_method
@@ -159,6 +214,7 @@ class TaskDetailEditor(tk.LabelFrame):
         #print("set_note")
         self.notes.delete("1.0", "end")
         self.notes.insert("1.0", note)
+        self._detect_and_tag_links()
 
     def clear_note(self):
         self.notes.delete("1.0", "end")
