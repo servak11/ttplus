@@ -37,6 +37,7 @@ class DateLabel(tk.Frame):
         # Lock Button (Toggle)
         self.lock_button = tk.Button(self.first_line, text="🔒", relief=tk.RAISED, command=self.toggle_spinbox)
         self.lock_button.pack(side=tk.LEFT)
+        self.lock_button.config(state=tk.DISABLED)
 
         self.tooltip = ToolTip(self.lock_button, "Lock")  # Attach Tooltip
 

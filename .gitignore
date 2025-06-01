@@ -1,7 +1,7 @@
 __pycache__
 __pycache__/
 backup
-tasks.json
+*.json
 ttplus.code-workspace
 backup/
 clickable_text.py

@@ -143,7 +143,6 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import PhotoImage
 
-import json
 from datetime import datetime
 
 from mod_table import TableWidget
@@ -153,10 +152,17 @@ from mod_db import Database
 from mod_about import AboutDialog
 from mod_detaileditor import TaskDetailEditor
 
+from mod_tt_bridge import browse_data
+
+
 # Task 1
 ## Design the Time Tracker
 # Create application window
 root = tk.Tk()
+# Tkinter on Linux supports PNG or GIF images for icons.
+# use iconphoto():
+# root.iconbitmap("img/ttplus.ico")
+root.iconphoto(False, tk.PhotoImage(file="img/ttplus.png"))  # Use PNG instead of ICO
 root.title("Work Tasks Plus")
 root.geometry("800x700+500+75")
 
@@ -167,30 +173,9 @@ def on_close():
     root.quit()
     root.destroy()  # Destroy the Tkinter window
 
+
 root.protocol("WM_DELETE_WINDOW", on_close)  # Handle window close event
 
-# create python function which
-# - takes indefinite number of parameters,
-# - converts them all to strings,
-# - creates a tuple from the strings
-# - uses " ".join() method on the tuple
-# - returns the result!
-def status_inc(*args):
-    # Convert all parameters to strings and create a tuple
-    string_tuple = tuple(str(arg) for arg in args)
-
-    t=status_bar.cget("text") + " -- "
-    
-    # Use " ".join() to create a single string from the tuple
-    status_bar.config(text = t + " ".join(string_tuple))
-def status(*args):
-    # Convert all parameters to strings and create a tuple
-    string_tuple = tuple(str(arg) for arg in args)
-
-    # Use " ".join() to create a single string from the tuple
-    status_bar.config(text = " ".join(string_tuple))
-    #result = " ".join(string_tuple)
-    #return result
 
 # Populate Table 1
 def populate_table1():
@@ -238,6 +223,7 @@ def dm_hm(ts):
 def subst_timestamp(l):
     # l is a list with task_details
     for dict1 in l:
+        # for the timestamp string
         # - the format `YYYYMMDDHHMMSS` shall be used
         # Extract HH:MM from the timestamp string
         ts = dict1["Start Time"]
@@ -325,7 +311,7 @@ def update_task_name(event=None):
                 # this was a placeholder, convert it into a real task
                 global task_placeholder_id
                 task_id = generate_short_task_id(task_placeholder_id)
-                status("add new task",task_id)
+                status_bar.s_set("add new task",task_id)
                 database["work_tasks"][task_id] = {
                             "fti": task_placeholder_id,
                             "sti": task_id,
@@ -389,7 +375,7 @@ def update_task_note(event=None):
 # with the data provided by the task detail editor
 #
 # The function is called as a callback from the Task Detail Editor
-# Because it has full control, it provides the following:
+# Because it has full access to database, it provides the following:
 # d_new_details - the dictionary of changed items only
 def update_task_details(d_new_details):
     #print("d_new_details =",d_new_details)
@@ -433,7 +419,7 @@ def update_task_details(d_new_details):
     # read the full row from table 2 to later update it
     values = table2.item(selected_item)["values"]
     new_detail = tde.get_name()
-    #status("edit detail",str(detail_index),"of task",str(task_id),new_detail)
+    #status_bar.s_set("edit detail",str(detail_index),"of task",str(task_id),new_detail)
     # print("-- OLD Values = ",values)
 
     # print("updated DATA1 ",
@@ -482,7 +468,7 @@ def on_table1_select(event):
         # find the selected task in the database
         values = table1.item(selected_item)["values"] # read the full row from table 1
         task_id = values[0]
-        status("Selected task ",task_id)
+        status_bar.s_set("Selected task ",task_id)
         detail_list = database["task_details"].get(task_id)
         # detail_list is the list of dictionaries
         #print(" -> assert ",short_task_id,"==",task["sti"])
@@ -499,22 +485,40 @@ def on_table2_select(event):
         task_id = table1.item(table1.selection(), "values")[0]
         # get index of current detail in the table2
         detail_index = table2.index(selected_item[0])
-        status("Selected task detail #",detail_index," of task ",task_id)
+        status_bar.s_set("Selected task detail #",detail_index," of task ",task_id)
 
-        d1 = None
         try:
             # get full record of the details
             d_entry = database["task_details"].get(task_id)[detail_index]
+            # this is the place to match the tde entry with timetracking
+            # and update status
+            from mod_timetrack import TimeTracking
+            tracker = TimeTracking()
+            # TODO move this to TimeTracking task
+            status_bar. s_set(
+                "Timekeeping earliest date " + # earliest_date
+                tracker.tw_report(database["task_details"]).strftime('%d.%m.%Y')
+            )
+            db_sts = datetime.strptime(d_entry["Start Time"], "%Y%m%d%H%M%S")
+            status_bar. s_act(
+                db_sts, 
+                tracker.check_deviation(d_entry)
+            )
+
+            # If the task was overdue, display a red status message
+            #if time_diff_minutes != 0:
+            #    status_bar.s_set(datetime.strptime(closest_dt, "%d.%m.%Y%H:%M"))
         except IndexError:
             ### in case of placeholder the data would not load
             #d_entry = None # NO!!! create new entry already?
             # Attention! In the database the entry would only be created
             # after on_change() triggered in details editor
             # -> that would trigger update_task_details()
+            id = generate_task_id()
             d_entry = {
-                "Start Time": generate_task_id(),
-                "End Time": generate_task_id(),
-                "What was done": "add detail ..."
+                "Start Time"    : id,
+                "End Time"      : id,
+                "What was done" : "add detail ..."
             }
             tde.run_clock()
 
@@ -527,6 +531,62 @@ def current_time():
 def show_about():
     AboutDialog(master=root)
 
+def show_report():
+    # go through all
+    #detail_list = database["task_details"].get(task_id)
+    #print("detail_list = ")
+    # will print number of tasks:
+    #print(f"* Number of records per task ({len(database["task_details"])} tasks)")
+    #for task_detail_list in database["task_details"].values():
+    #    print(f"{}" ... len(task_detail_list))
+    # compose list
+    report_list=[]
+    for task_id, task_detail_list in database["task_details"].items():
+        for detail_dict in task_detail_list:
+            sts = detail_dict["Start Time"]
+            s = f"{sts[4:6]} {dm_hm(sts)} - {dm_hm(detail_dict["End Time"])} : {database["work_tasks"][task_id]["tnm"]:16}... {detail_dict["What was done"]}"
+            report_list.append(s)
+            #print(s)
+    # sort list
+    print("\n".join(sorted(report_list)))
+
+# show report for the selected task
+# goal to determine time spent
+def show_task_report():
+    # find index of current note in the database
+    task_id = table1.item(table1.selection(), "values")[0]
+
+    # get full list of the detail dictionaries
+    l = database["task_details"].get(task_id)
+    print(f"detail dictionariy size {len(l)}")
+    i = 0
+    effort = 0 # minutes
+    print("NN : effort [\"What was done\"]")
+    print("---:---------------------------")
+    for dict in l:
+        # get timestamps
+        tss = datetime.strptime(dict["Start Time"], "%Y%m%d%H%M%S")
+        tse = datetime.strptime(dict["End Time"],   "%Y%m%d%H%M%S")
+        # Compute difference
+        delta = tse - tss
+        # Format difference in hh:mm
+        report = f"{delta.seconds // 3600:02}:{(delta.seconds % 3600) // 60:02}"
+        i=i+1
+        print(f"{i:>2} : {report} {dict["What was done"]}")
+        effort = effort + (delta.seconds // 60)
+    effort_total = f"{effort // 60:03}:{(effort % 60):02}"
+    print("---:---------------------------")
+    print(f"TTL: {effort_total}")
+
+
+    # store the edited note there
+    #l[detail_index]["note"]         = new_detail
+    #l[detail_index]["Start Time"]   = tde.get_start_time  ()
+    #l[detail_index]["End Time"]     = tde.get_end_time    ()
+
+
+
+
 # === MAIN APPLICATION ===
 
 db = Database()
@@ -534,10 +594,13 @@ database = db.load_data()
 
 task_placeholder_id = "00000"
 
+
 # Create status bar and print database info there initially
+# the class StatusBar calls pack()
+from mod_statusbar import StatusBar
 info = (str(database["work_tasks"].__class__),"database contains",str(len(database["work_tasks"])),"records")
-status_bar = tk.Label(text = " ".join(info),relief=tk.SUNKEN, anchor="w")
-status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+status_bar = StatusBar(root)
+
 
 # Create a menu bar
 menu_bar = tk.Menu(root)
@@ -546,6 +609,9 @@ root.config(menu=menu_bar)
 # Add the "Help" menu
 help_menu = tk.Menu(menu_bar, tearoff=0)
 menu_bar.add_command(label="About", command=show_about)
+menu_bar.add_command(label="Work Report", command=show_report)
+menu_bar.add_command(label="Detail Effort Report", command=show_task_report)
+#menu_bar.add_command(label="TW", command=tw_report)
 
 # Table 1 (Work Tasks)
 frame1 = ttk.LabelFrame(root, text="Work Tasks")

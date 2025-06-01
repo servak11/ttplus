@@ -46,7 +46,8 @@ class TaskDetailEditor(tk.LabelFrame):
         self.timestamp = ""
         ## Reference to the Database entry currently loaded into the editor
         self.d1 = None
-        self.run = 0
+        self.count_time = False
+        self.note_loaded = False
 
         # Bind events for all controls
         self.task_detail.bind("<KeyRelease>", self._on_change)
@@ -61,17 +62,18 @@ class TaskDetailEditor(tk.LabelFrame):
         self.end_minute.bind("<ButtonRelease-1>", self._on_change)
 
     def _create_note_detail_head(self):
-        first_line = tk.Frame(self)
-        first_line.pack(fill="x", padx=5, pady=5)
+        self.first_line = tk.Frame(self)
+        self.first_line.pack(fill="x", padx=5, pady=5)
+        fr = self.first_line
 
         # Current date label => put into first_line
-        self.date_control = DateLabel( first_line )
+        self.date_control = DateLabel( fr )
         self.date_control.pack(side="left", padx=5)
         self.date_control.set_callback(self.update_detail_date)
 
         # current_date = datetime.now().strftime("%d.%m.%Y")
         # # date_label holds the date of the note detail
-        # self.date_label = tk.Label(first_line,
+        # self.date_label = tk.Label(fr,
             # text=current_date,
             # font=("Verdana", 12))
         # self.date_label.pack(side="left", padx=5)
@@ -81,37 +83,60 @@ class TaskDetailEditor(tk.LabelFrame):
         # self.spin_var = tk.IntVar(value=0)  # Controls the spinbox value
 
         # TimeSpinControls for start and end times of the note detail - editable
-        self.start_hour = TimeSpinControl(first_line, max_value=23)
+        self.start_hour = TimeSpinControl(fr, max_value=23)
         self.start_hour.pack(side="left", padx=5)
         
-        self.start_minute = TimeSpinControl(first_line, max_value=59)
+        self.start_minute = TimeSpinControl(fr, max_value=59)
         self.start_minute.pack(side="left", padx=5)
 
-        self.end_hour = TimeSpinControl(first_line, max_value=23)
+        self.end_hour = TimeSpinControl(fr, max_value=23)
         self.end_hour.pack(side="left", padx=5)
         
-        self.end_minute = TimeSpinControl(first_line, max_value=59)
+        self.end_minute = TimeSpinControl(fr, max_value=59)
         self.end_minute.pack(side="left", padx=5)
 
         # Text field for task detail name
-        self.task_detail = tk.Entry(first_line, font=("Verdana", 12))
+        self.task_detail = tk.Entry(fr, font=("Verdana", 12))
         self.task_detail.pack(side="left", fill="x", expand=True, padx=5)
         self.task_detail.insert(0, "Task Detail")
+        #self.task_detail.config(state=tk.DISABLED)
+
+        self._disable_widgets(self.first_line)
+
+    # Get all child widgets in the given frame
+    # Check if widget supports config method and disable widget
+    # this is to avoid generation of exceptions in onchange when note not loaded
+    def _disable_widgets(self,frame):
+        for widget in frame.winfo_children():  
+            if hasattr(widget, "config"):
+                try:
+                    widget.config(state=tk.DISABLED)
+                except tk.TclError:
+                    pass  # Ignore Frames that do not support 'state'
+    def _enable_widgets(self,frame):
+        for widget in frame.winfo_children():  
+            if hasattr(widget, "config"):
+                try:
+                    widget.config(state=tk.NORMAL)
+                except tk.TclError:
+                    pass  # Ignore Frames that do not support 'state'
 
     def _create_note_detail_editor(self):
-        second_line = tk.Frame(self)
-        second_line.pack(fill="both", expand=True, padx=5, pady=5)
+        self.second_line = tk.Frame(self)
+        self.second_line.pack(fill="both", expand=True, padx=5, pady=5)
 
         # Large text field for the task detail notes
         self.notes = tk.Text(
-            second_line,
+            self.second_line,
             wrap="word",
             font=("Lucida Console", 11),
             undo=True
         )
         self.notes.pack(fill="both", expand=True, padx=5, pady=5)
-        self.notes.insert("1.0", "Notes about the task...")
+        # Disable editing until note selection is made
+        self.notes.insert("1.0", "Please select note ...")
         self.notes.edit_reset()
+        self.notes.config(state=tk.DISABLED)
 
         # Bind Ctrl+Z for Undo
         self.notes.bind("<Control-z>", self._undo_text)
@@ -155,7 +180,8 @@ class TaskDetailEditor(tk.LabelFrame):
     # — the only modification is the visual formatting applied through tags
     def _detect_and_tag_links(self):
         content = self.notes.get("1.0", tk.END)
-        matches = re.finditer(r'https?://\S+', content)
+        #matches = re.finditer(r'https?://\S+', content)
+        matches = re.finditer(r'https?://[^\s,;]+[.][a-zA-Z]{2,}', content)
         count_links = 0
         tg="none"
         for match in matches:
@@ -172,7 +198,7 @@ class TaskDetailEditor(tk.LabelFrame):
             self.notes.tag_add(tg, tag_start, tag_end)
             self.notes.tag_configure(tg, foreground="blue", underline=True)
             self.notes.tag_bind(tg, "<Button-1>", self._open_link)
-        print(f"Converted to {tg}: {count_links} links")
+        #print(f"Converted to {tg}: {count_links} links")
 
     def set_callback(self, update_task_details_method):
         self.callback = update_task_details_method
@@ -192,6 +218,10 @@ class TaskDetailEditor(tk.LabelFrame):
     def load_data(self, dict_data):
         if dict_data:
             self.d1 = dict_data
+            # Enable editing of selected note
+            self._enable_widgets(self.first_line)
+            self._enable_widgets(self.second_line)
+            self._enable_widgets(self.date_control.first_line)
             # populate date control
             # - the timestamp is now controlled in the date_control
             # TODO when pressed unlock date, shall the time spins be disabled?
@@ -211,8 +241,14 @@ class TaskDetailEditor(tk.LabelFrame):
             except KeyError:
                 ### it is not bad if the note text was not available
                 pass
+            self.note_loaded = True
         else:
             print("Placeholder Hit!")
+            # Disable editing until note name created
+            self.notes.config(state=tk.NORMAL)
+            self.notes.insert("1.0", "Please give note a name ...")
+            self.notes.config(state=tk.DISABLED)
+
 
     def get_data(self):
         # in case placeholder was hit,
@@ -220,9 +256,9 @@ class TaskDetailEditor(tk.LabelFrame):
         # created in the ttplus.on_table2_select()
         # and supplied via TaskDetailEditor.load_data()
         #
-        if date_control.date_changed:
+        if self.date_control.date_changed:
             # take changed timestamp
-            d = date_control.get_date()[:8] # strftime("%Y%m%d%H%M%S")[:8]
+            d = self.date_control.get_date()[:8] # strftime("%Y%m%d%H%M%S")[:8]
             print(f"new fate {d}")
             # and add it to the start and end times
             self.d1["Start Time"]           = d + self.d1["Start Time"] [8:]
@@ -232,6 +268,12 @@ class TaskDetailEditor(tk.LabelFrame):
     def _on_change(self, event):
         # Determine which widget triggered the event
         widget = event.widget
+
+        if not self.note_loaded:
+            return  # Ignore the event
+
+        if widget['state'] == tk.DISABLED:
+            return  # Ignore the event
 
         # create dictionary of changed items to supply to the update callback
         d_new_details = {}
@@ -321,17 +363,17 @@ class TaskDetailEditor(tk.LabelFrame):
         self.end_minute.insert(0, m)
 
     def run_clock(self):
-        self.run = 1
+        self.count_time = True
         self.update_time()
     def stop_clock(self):
-        self.run = 0
+        self.count_time = False
     def update_time(self):
         """ Updates the spinbox to show the current system time. """
         # run set_end_time automatically for a started task
         self.set_end_time(datetime.now().strftime("%Y%m%d%H%M%S"))
 
         # Schedule the next update after 60 seconds
-        if self.run:
+        if self.count_time:
             self.after(60000, self.update_time)
 
 # Example Usage
