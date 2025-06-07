@@ -220,6 +220,7 @@ def extract_items(data_dict, index_list):
 
 def dm_hm(ts):
     return ts[6:8] + "." + ts[4:6] +" "+ ts[8:10] + ":" + ts[10:12]
+
 def subst_timestamp(l):
     # l is a list with task_details
     for dict1 in l:
@@ -231,8 +232,6 @@ def subst_timestamp(l):
         ts = dict1["End Time"]
         dict1["End Time"] = dm_hm(ts)
     return l
-
-
 
 # Populate Table 2 provided the details list
 def populate_table2(detail_list):
@@ -457,16 +456,48 @@ def delete_task():
         for row in table2.get_children():
             table2.delete(row)
 
+# force select a task in table 1
+# we can only select anything by first selecting the task
+# @param task_id id of the task to select in the table1
+def select_task_by_id(task_id):
+    # search for table entry with this task_id
+    for item in table1.get_children():
+        values = table1.item(item, "values")
+        if task_id in values:
+            # Select the task row in the table
+            table1.selection_set(item)
+            # TODO the selected task was changed, need to reset task detail editor in disabled state
+            # Tested: the select event triggered automatically
+            #table1.event_generate("<<TreeviewSelect>>")  # Trigger selection event
+            break  # Stop after first match
+
 # Handle selection in Table 1
+#
+# Tkinter Treeview, si = table.item(selected_item) returns dictionary
+# with keys like "text", "image", and "values"
+#
+# Here
+# task_id   = si["values"][0]
+# task_name = si["values"][1]
+# 
 def on_table1_select(event):
     tde.stop_clock()
     selected_item = table1.selection()
+    print("selected_item = ", selected_item)
+    # tuple
+    #print("class = ", selected_item.__class__)
+    # read the full data row from table 1
+    values = table1.item(selected_item, "values")
+    print("values = ", values) # tuple
+    # dict
+    #print("class of table1.item(selected_item) = ", table1.item(selected_item).__class__)
+    print("dict = ", table1.item(selected_item))
     # load for editing
     textfield_task_name.delete(0, tk.END)
-    textfield_task_name.insert(0, table1.item(selected_item, "values")[1])
+    textfield_task_name.insert(0, values[1])
+    # TODO the selected task was changed, need to reset task detail editor in disabled state
     if selected_item:
         # find the selected task in the database
-        values = table1.item(selected_item)["values"] # read the full row from table 1
         task_id = values[0]
         status_bar.s_set("Selected task ",task_id)
         detail_list = database["task_details"].get(task_id)
@@ -550,6 +581,11 @@ def show_report():
     # sort list
     print("\n".join(sorted(report_list)))
 
+
+def tt_test_action():
+    select_task_by_id("e8ad4")
+
+
 # show report for the selected task
 # goal to determine time spent
 def show_task_report():
@@ -611,6 +647,7 @@ help_menu = tk.Menu(menu_bar, tearoff=0)
 menu_bar.add_command(label="About", command=show_about)
 menu_bar.add_command(label="Work Report", command=show_report)
 menu_bar.add_command(label="Detail Effort Report", command=show_task_report)
+menu_bar.add_command(label="Test", command=tt_test_action)
 #menu_bar.add_command(label="TW", command=tw_report)
 
 # Table 1 (Work Tasks)

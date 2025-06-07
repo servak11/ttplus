@@ -1,6 +1,7 @@
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support.ui import Select
@@ -10,6 +11,7 @@ from dataclasses import dataclass
 from typing import List
 
 import json
+import os
 import time
 from datetime import datetime, timedelta
 
@@ -26,6 +28,20 @@ class Entry:
     activity:   str
     comment:    str
 
+# connect to the webpage
+# select PRZ sheet
+# select and display the span of 2 weeks in the sheet
+# return all inputs relevant for user from that sheet
+# @return list of lists
+# - each list contains values of row elements
+#   row #
+#   WeekDay, Date DD.MM.YYYY
+#   TT:MM start
+#   TT:MM end
+#   project
+#   comment
+#   project item - note last item in the list,
+#   because added from selector element in the end
 def browse_data(
         #date: str,
         #data: List[Entry],
@@ -33,15 +49,25 @@ def browse_data(
         url=None
     ):
 
-    # Set up Edge options for headless mode (no visible window)
-    edge_options = Options()
+    if 0:
+        # Set up Edge options for headless mode (no visible window)
+        edge_options = Options()
+        edge_options.add_argument("--headless")
+        # Improve performance
+        edge_options.add_argument("--disable-gpu")  
+        driver = webdriver.Edge(options=edge_options)
+
+    #from selenium import webdriver
+    edge_options = webdriver.EdgeOptions()
     edge_options.add_argument("--headless")
     # Improve performance
     edge_options.add_argument("--disable-gpu")  
+    edge_options.add_argument("--disable-features=EdgeIdentity")
+    driver = webdriver.Edge(options=edge_options)
 
     if driver is None:
         # Initialize WebDriver
-        driver = webdriver.Edge(options=edge_options)
+        driver = webdriver.Edge()
     if url is None:
         url = URL
 
@@ -63,10 +89,14 @@ def browse_data(
 
     from config import u_r, p_d
 
-    # Find the username and password fields and enter your credentials
+    # Find the username and password fields and enter credentials
     E("Uname").send_keys(u_r[:len(u_r)-3])
     E("PWD").send_keys(p_d[:len(p_d)-3])
-    E("an").click()
+    # .click() generates error in headless mode
+    # selenium.common.exceptions.ElementClickInterceptedException:
+    # button is not clickable at point (250, 419)
+    #E("an").click()
+    driver.execute_script("arguments[0].click();", E("an"))
 
     menujson_element = E("menujson")
     menujson = json.loads(menujson_element.get_attribute("innerHTML"))
@@ -105,9 +135,6 @@ def browse_data(
     # <option value="005"
     #     id="FromDate05.05.2025!&amp;!ToDate05.05.2025!&amp;!">003 -
     #     PRZ (kumuliert)</option>
-    # <option value="006" selected="selected"
-    #     id="FromDate05.05.2025!&amp;!ToDate05.05.2025!&amp;!">003 -
-    #     PRZ (Zeitspanne)</option>
     activity = E("wrksht")
     activities = activity.find_elements(By.TAG_NAME, "option")
     a = None
@@ -123,20 +150,26 @@ def browse_data(
 
     date_range = "FromDate26.05.2025!&amp;!ToDate30.05.2025!&amp;!"
 
-    # Locate the select dropdown "Mappe"
+    # 1. Select Zeiterfassungs Mappe - timetracking sheet
+    #
+    # Locate the select dropdown "Mappe", select value 006 for PRZ
+    # <option value="006" selected="selected"
+    #     id="FromDate05.05.2025!&amp;!ToDate05.05.2025!&amp;!">003 -
+    #     PRZ (Zeitspanne)</option>
     dropdown = Select(driver.find_element("id", "wrksht"))
     dropdown.select_by_value("006")
 
     #time.sleep(3)
 
-    # Calculate the date one week before today
-    new_date = (datetime.today() - timedelta(weeks=1)).strftime("%d.%m.%Y")
+    # 2. Select the date range
+    #
+    # Calculate the date two weeks before today
+    new_date = (datetime.today() - timedelta(weeks=2)).strftime("%d.%m.%Y")
 
-    # the "to date" is today, so ok
-    # now locate the input field for "from date" and delete content
+    # the "to date" is today, leave as is
+    # locate the input field for "from date"
+    # select content (Ctrl-a), send new date there, Tab to update value
     frdate = E("frD")
-    #for k in range(10):
-    #    input_field.send_keys(Keys.BACKSPACE)
     frdate.click()
     frdate.send_keys(Keys.CONTROL, "a")
     frdate.send_keys(new_date, Keys.TAB)
@@ -154,47 +187,59 @@ def browse_data(
 
     time.sleep(1)
 
-    # button loads table into iframe
-    # Switch to the iframe using its ID
+    # The timetracking sheet would now be loaded into an IFRAME !
+    #
+    # Hierarchy
+    # mainWinTable
+    # - class content-main
+    # -- reitermain
+    # --- divAll
+    # ---- div_tblfldfr
+    # ----- .. table
+    # ----- .. table
+    # ----- .. td(iframe nmfrfrrest) td(id tren_tbl) td (iframe tblfldfr)
+    # This is timetracking iframe
+    # <iframe frameborder="0" id="tblfldfr" style="width: 692.478px; height: 485.115px; overflow: hidden; border: none;" src="../tisowareClient/0b6436d9657672fa53b2c26e73b0cd3e19c1f4ad86f7c7132fed37b0f151184d/inff1079215197.html" name="tblfldfr" scrolling="no" class="inbindresize"></iframe>
+    #  tblfldfr
+    #
+    # Need to SWITCH to the iframe using its ID !
     iframe = driver.find_element(By.ID, "tblfldfr")
     driver.switch_to.frame(iframe)
-
-    # Now interact with elements inside the iframe
-    #input_field = driver.find_element(By.ID, "tbl_12_1")
-    #input_field.send_keys("NewValue")
-
 
     # Wait for the erfassung table to appear:
     table = wait.until(EC.presence_of_element_located((By.ID, "dvTblFLmain")))
 
     print("Table found:", table.id)
     # Find all rows inside the table
-    rows = table.find_elements(By.TAG_NAME, "tr")    
+    rows = table.find_elements(By.TAG_NAME, "tr")
     # Get the row count
     row_count = len(rows)
     print(f"Number of rows: {row_count}")
     text_inputs = rows[0].find_elements(By.CSS_SELECTOR, "input[type='text']")
     inpus_count = len(text_inputs)
-    print(f"Number of text inputs: {inpus_count}")
     # Print the IDs of all found input fields
-    ali = [10,20,30,40,50]
+    inf_list = []
     for inf in text_inputs:
-        print(inf.get_attribute("id") + ("-" * 15))
+        #print(inf.get_attribute("id") + ("-" * 15))
+        inf_list.append( inf.get_attribute("id") )
+    print(f"Reading {inpus_count} text inputs: {inf_list}")
     k=1
     row_list = []
     for row in rows:
+        # find all input elements in selected row and add them to info row
         text_inputs = row.find_elements(By.CSS_SELECTOR, "input[type='text']")
         inf_list = []
-        inf_list = [f"{k:>5}:"]
-        for inf in text_inputs:
+        inf_list = [f"{k:>5}:"]  # row number
+        for inf in text_inputs:  # get all values
             inf_list.append(inf.get_attribute("value"))
         #print("  ".join(inf_list))
         k=k+1
+        # find the select element for "type of work" -- 2nd selector
         select_elements = row.find_elements(By.CSS_SELECTOR, "select")
         #print(select_elements[1].get_attribute("id"))
         selected_option = Select(select_elements[1]).first_selected_option
         #print(selected_option.text)
-        inf_list.append(selected_option.text)
+        inf_list.append(selected_option.text) # add option to the list
         row_list.append(inf_list)
 
     return row_list
@@ -363,4 +408,176 @@ def browse_data(
             E("netblbuchaend").click()
 
 if __name__ == "__main__":
-    browse_data()
+
+    ttdb = "tw_data.json"
+
+    # Load JSON data - old format
+    with open(ttdb, "r", encoding="utf-8") as file:
+        records = json.load(file)
+
+
+    # Check if the file exists
+    if os.path.exists(ttdb):
+        # Read the JSON data
+        with open(ttdb, "r", encoding="utf-8") as file:
+            data = json.load(file)
+        
+        # Extract records from JSON structure
+        records = data.get("records", [])
+
+        # Convert date and time to datetime objects
+        timestamps = []
+        for row in records:
+            date_str    = row[1] # Example: "Do, 22.05.2025"
+            start_time  = row[2] # Example: "06:06"
+            end_time    = row[3] # Example: "07:51"
+
+            # Parse date ignoring day name (split by comma and take the second part)
+            date_part = date_str[2:]
+
+            # Combine date and time
+            format = "%H:%M, %d.%m.%Y"
+            start_dt = datetime.strptime( start_time + date_part, format)
+            end_dt   = datetime.strptime( end_time   + date_part, format)
+            
+            # Add both timestamps to the list
+            # .extend() is more efficient when adding multiple items at once
+            timestamps.extend([start_dt, end_dt])
+
+        # Find earliest and latest timestamps
+        earliest    = min(timestamps)
+        latest      = max(timestamps)
+
+        print(f"Earliest timestamp: {earliest}")
+        print(f"Latest   timestamp: {latest}")
+
+    else:
+        print(f"File '{ttdb}' does not exist.")
+
+###
+
+
+    db_updated = 0
+    if 0:
+        # TODO use the latest day to set the date in browse from which start browsing
+        timetrack_list = browse_data()
+        db_updated = 1
+        # TODO append timetrack_list to the loaded list of records
+    else:
+        print("skip browse_data()")
+        timetrack_list = records
+
+    if db_updated:
+        # save time tracking data to file
+        print("export data to database", ttdb)
+        # Define header of the file with comments about the record structure
+        header_info = {
+            "description": "This file contains time-tracking records imported from tisoware.",
+            "fields": [
+                "Record No (str): Unique identifier for each entry '   NN.'",
+                "Date (str): The date of work",
+                "Start Time (str): Time when work started",
+                "End Time (str): Time when work ended",
+                "Project Key (str): Identifier for the project",
+                "Comment (str): Notes about the work",
+                "Project Item (str): Subcategory of the project"
+            ],
+            "generated_on": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "date range": f"{earliest} - {latest}"
+        }
+        # Combine header and records into a structured JSON file
+        json_data = {
+            "header": header_info,
+            "records": timetrack_list
+        }
+
+        # Save to JSON file
+        with open(ttdb, "w", encoding="utf-8") as json_file:
+            json.dump(json_data, json_file, indent=2)
+
+        print(f"Timetracking info stored to JSON file '{ttdb}'")
+    else:
+        print(f"skip save database, as db_updated = {db_updated}")
+
+
+    # Check if the file exists
+    if not os.path.exists(ttdb):
+        print(f"Database '{ttdb}' does not exist.")
+    else:
+        print(f"Database '{ttdb}' found - will show in GUI")
+
+    if db_updated:
+        # Re-read the database
+        # 
+        # I have json file 
+        #     ttdb = "tw_data.json"
+        #  of following timetracking records
+        #   [
+        #     "    1:",               # record number
+        #     "Do, 22.05.2025",       # date
+        #     "06:06",                # start time
+        #     "07:51",                # end time
+        #     "9300_2025_Fs-DCP",     # project key
+        #     "Firmware",             # comment about the work
+        #     "65.10 Entwicklungsarbeit (8273)"   # project item
+        #   ],
+        # create table in Tkinter gui to display these records
+        #
+        # window geometry 800 x 600
+        # first 4 columns shall be narrow, last 3 information columns wide
+
+        # Load JSON data
+        with open(ttdb, "r", encoding="utf-8") as file:
+            data = json.load(file)
+
+        records = data.get("records", [])
+
+    import tkinter as tk
+    from tkinter import ttk
+
+    # Create the Tkinter window
+    root = tk.Tk()
+    root.title("Timetracking Records")
+    root.geometry("1200x600")  # Set window size to 800x600 pixels
+
+    # Create a Treeview widget for the table
+    columns = ("Record No", "Date", "Start Time", "End Time", "Project Key", "Comment", "Project Item")
+    tree = ttk.Treeview(root, columns=columns, show="headings")
+
+    # Define column widths (first 4 narrow, last 3 wide)
+    column_widths = [60, 100, 80, 80, 200, 250, 250]
+
+    for col, width in zip(columns, column_widths):
+        tree.heading(col, text=col)
+        tree.column(col, width=width)
+
+    # Insert records into the table
+    for record in records:
+        tree.insert("", tk.END, values=record)
+
+    # Create a right-click menu
+    menu = tk.Menu(root, tearoff=0)
+    menu.add_command(label="Edit", command=lambda: print("Edit selected row"))
+    menu.add_command(label="Delete", command=lambda: print("Delete selected row"))
+
+    # Function to show menu on row click
+    def show_menu(event):
+        item = tree.identify_row(event.y)
+        if item:
+            tree.selection_set(item)  # Select the clicked row
+            menu.post(event.x_root, event.y_root)
+
+    # The Tkinter table displaying timetracking records
+    # shall have action displaying menu
+    # when man clicks any of the table rows
+    #
+    # Bind right-click action to the table
+    tree.bind("<Button-3>", show_menu)  # Right-click (Windows/Linux)
+    tree.bind("<Control-Button-1>", show_menu)  # Ctrl+Left-click (Mac)
+
+    # Pack the table into the window
+    tree.pack(expand=True, fill="both")
+
+    # Run the Tkinter loop
+    root.mainloop()
+
