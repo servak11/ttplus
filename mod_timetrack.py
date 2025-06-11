@@ -32,6 +32,7 @@ class TimeTracking:
     #       with empty project entry in the reference
     # @return earliest_date the records are missing entries
     def tw_report( self, db, empty_project_only = False):
+        json_data = {}
         timetrack_list = []
         if 0:
             # use selenium to obtain the timekeeping data
@@ -41,8 +42,16 @@ class TimeTracking:
             with open("tw_data.json", "w") as json_file:
                 json.dump(timetrack_list, json_file, indent=2)
         else:
-            with open("tw_data.json", "r") as json_file:
-                timetrack_list = json.load(json_file)
+            import os
+            if os.path.exists("tw_data.json"):
+                with open("tw_data.json", "r") as json_file:
+                    timetrack_list = json.load(json_file)
+            else:
+                json_data = {
+                    "header" : {},
+                    "records": {}
+                }
+                timetrack_list = json_data["records"]
 
         #for row in timetrack_list:
         #    #for inf in row:
@@ -73,7 +82,10 @@ class TimeTracking:
             ]
 
         # Find the earliest date
-        earliest_date = min(dates)
+        if not [] == dates:
+            earliest_date = min(dates)
+        else:
+            earliest_date = datetime. now()
 
         # prepare list of task details starting earliest date
         td_report_list=[]

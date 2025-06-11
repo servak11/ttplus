@@ -215,10 +215,33 @@ class TaskDetailEditor(tk.LabelFrame):
             if self.callback:
                 self.callback({})
 
+    # reset editor to clear display of previous note info
+    def reset_editor(self):
+        self.d1 = None
+        # clear note name before disabling it
+        self.set_name        ("")
+        # clear note text
+        self.notes.config(state=tk.NORMAL)
+        self.notes.insert("1.0", "Please select note ...")
+        self.set_note        ("Please select note ...")
+        self.notes.edit_reset()
+        self.notes.config(state=tk.DISABLED)
+        self.start_hour     .delete(0, "end")
+        self.start_minute   .delete(0, "end")
+        self.end_hour       .delete(0, "end")
+        self.end_minute     .delete(0, "end")
+        self._disable_widgets(self.first_line)
+        self._disable_widgets(self.second_line)
+        #TODO this was used to remove the first line of control from the view
+        # but did not find way to restore it!
+        #self.first_line.pack_forget()  # Hide the frame from the layout
+
+    # load the data into editor from the provided dictionary structure
     def load_data(self, dict_data):
         if dict_data:
             self.d1 = dict_data
             # Enable editing of selected note
+            self.first_line.pack(fill="x", padx=5, pady=5)  # Repack the frame (unhide)
             self._enable_widgets(self.first_line)
             self._enable_widgets(self.second_line)
             self._enable_widgets(self.date_control.first_line)
@@ -232,15 +255,20 @@ class TaskDetailEditor(tk.LabelFrame):
             self.set_name        (self.d1["What was done"])
             self.set_start_time  (self.d1["Start Time"])
             self.set_end_time    (self.d1["End Time"])
+            ### it is not bad if the note text was not available, would be empty
+            self.set_note(self.d1.get("note", ""))
+
+            # TODO then we do not need the below code
             # set the note text
-            try:
-                self.set_note    (self.d1["note"])
-            except IndexError:
-                ### it is not bad if the note text was not available
-                pass
-            except KeyError:
-                ### it is not bad if the note text was not available
-                pass
+            #try:
+            #    self.set_note    (self.d1["note"])
+            #except IndexError:
+            #    ### it is not bad if the note text was not available
+            #    pass
+            #except KeyError:
+            #    ### it is not bad if the note text was not available
+            #    pass
+
             self.note_loaded = True
         else:
             print("Placeholder Hit!")

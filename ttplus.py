@@ -152,8 +152,6 @@ from mod_db import Database
 from mod_about import AboutDialog
 from mod_detaileditor import TaskDetailEditor
 
-from mod_tt_bridge import browse_data
-
 
 # Task 1
 ## Design the Time Tracker
@@ -236,6 +234,10 @@ def subst_timestamp(l):
 # Populate Table 2 provided the details list
 def populate_table2(detail_list):
     table2.clear_table()
+    # - the selected task was changed,
+    # need to reset task detail editor in disabled state
+    # - clear and disable the editor before loading new task data
+    tde.reset_editor()
     if(detail_list):
         #print(detail_list)
         # TableWidget populate takes a dictionary, create it from the list, key is index
@@ -471,7 +473,9 @@ def select_task_by_id(task_id):
             #table1.event_generate("<<TreeviewSelect>>")  # Trigger selection event
             break  # Stop after first match
 
-# Handle selection in Table 1
+cur_selected_item = None
+
+# Handle selection of a new task in Table 1
 #
 # Tkinter Treeview, si = table.item(selected_item) returns dictionary
 # with keys like "text", "image", and "values"
@@ -483,19 +487,25 @@ def select_task_by_id(task_id):
 def on_table1_select(event):
     tde.stop_clock()
     selected_item = table1.selection()
-    print("selected_item = ", selected_item)
+    #print("selected_item list = ", selected_item)
+    global cur_selected_item
+    if cur_selected_item == selected_item[0]:
+        # selected item clicked again, nothing to do
+        return
+    # remember selected item
+    cur_selected_item = selected_item[0]
+    #print("cur selected_item = ", cur_selected_item)
     # tuple
     #print("class = ", selected_item.__class__)
     # read the full data row from table 1
     values = table1.item(selected_item, "values")
-    print("values = ", values) # tuple
+    #print("values = ", values) # tuple
     # dict
     #print("class of table1.item(selected_item) = ", table1.item(selected_item).__class__)
-    print("dict = ", table1.item(selected_item))
-    # load for editing
+    #print("dict = ", table1.item(selected_item))
+    # load the task name for editing
     textfield_task_name.delete(0, tk.END)
     textfield_task_name.insert(0, values[1])
-    # TODO the selected task was changed, need to reset task detail editor in disabled state
     if selected_item:
         # find the selected task in the database
         task_id = values[0]
@@ -575,7 +585,9 @@ def show_report():
     for task_id, task_detail_list in database["task_details"].items():
         for detail_dict in task_detail_list:
             sts = detail_dict["Start Time"]
-            s = f"{sts[4:6]} {dm_hm(sts)} - {dm_hm(detail_dict["End Time"])} : {database["work_tasks"][task_id]["tnm"]:16}... {detail_dict["What was done"]}"
+            ets = detail_dict["End Time"]
+            wwd = detail_dict["What was done"]
+            s = f"{sts[4:6]} {dm_hm(sts)} - {dm_hm(ets)} : {database['work_tasks'][task_id]['tnm']:16}... {wwd}"
             report_list.append(s)
             #print(s)
     # sort list
@@ -608,7 +620,7 @@ def show_task_report():
         # Format difference in hh:mm
         report = f"{delta.seconds // 3600:02}:{(delta.seconds % 3600) // 60:02}"
         i=i+1
-        print(f"{i:>2} : {report} {dict["What was done"]}")
+        print(f"{i:>2} : {report} {dict['What was done']}")
         effort = effort + (delta.seconds // 60)
     effort_total = f"{effort // 60:03}:{(effort % 60):02}"
     print("---:---------------------------")
