@@ -1,5 +1,18 @@
 Recommendations
 
+
+0. Manual improvements
+
+These actions are noted during usage
+- start time shall not grow above end time
+- move constants to constants.py
+- move all time handling into a separate module
+- in the task_details dictionaries
+  -- rename "Start Time"    to "st"
+  -- rename "End Time"      to "et"
+  -- rename "What was done" to "wd"
+  -- rename "note"          to "nt"
+
 By implementing these improvements, you can significantly enhance the code quality and structure of your project. Let me know if you'd like help with any specific aspect!
 
 1. Enhance Documentation:
