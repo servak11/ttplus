@@ -23,7 +23,7 @@
 #   "note": "Here note detail full detail including hyperlinks highlighting"
 #
 import tkinter as tk
-from datetime import datetime
+from util.mod_ts import *
 from mod_timespin import TimeSpinControl
 from mod_datelabel import DateLabel
 
@@ -236,8 +236,35 @@ class TaskDetailEditor(tk.LabelFrame):
         # but did not find way to restore it!
         #self.first_line.pack_forget()  # Hide the frame from the layout
 
-    # load the data into editor from the provided dictionary structure
     def load_data(self, dict_data):
+        """
+        Load the provided dictionary structure into the editor.
+
+        This method processes the input dictionary and populates the editor with its data. 
+        The dictionary should follow a specific structure compatible with the editor's requirements.
+
+        Args:
+            dict_data (dict): A dictionary containing the data to be loaded into the editor. 
+                              The keys and values in the dictionary
+                              must conform to the editor's format.
+
+        Returns:
+            None: This function does not return a value but modifies the editor's state.
+
+        Raises:
+            ValueError: If the provided dictionary structure is invalid or incompatible with the editor.
+            TypeError: If the input is not a dictionary
+
+        Example:
+            editor = Editor()
+            sample_data = {
+                "Start Time": "20250614065300",
+                "End Time": "20250614070337",
+                "What was done": "Improve documentation of the load_data()",
+                "note": "converted to docstrings"
+            }
+            editor.load_data(sample_data)
+        """
         if dict_data:
             self.d1 = dict_data
             # Enable editing of selected note
@@ -380,9 +407,9 @@ class TaskDetailEditor(tk.LabelFrame):
         return f"{d}{h}{m}00"
 
     def set_end_time(self, timestamp):
+        """ Extract hour and minute from the timestamp """
         #print("set_end_time")
         #self.timestamp = timestamp # remember for return path - but this is done in the set_start_time
-        # Extract hour and minute from the timestamp
         h = timestamp[8:10]
         m = timestamp[10:12]
         self.end_hour.delete(0, "end")
@@ -391,14 +418,22 @@ class TaskDetailEditor(tk.LabelFrame):
         self.end_minute.insert(0, m)
 
     def run_clock(self):
+        """ Control of the automatic timer of the current active task. """
         self.count_time = True
         self.update_time()
     def stop_clock(self):
+        """ Control of the automatic timer of the current active task. """
         self.count_time = False
     def update_time(self):
-        """ Updates the spinbox to show the current system time. """
-        # run set_end_time automatically for a started task
-        self.set_end_time(datetime.now().strftime("%Y%m%d%H%M%S"))
+        """
+        Updates the spinbox to show the current system time.
+        
+        Run set_end_time() for a started task note every minute.
+        This automatically counts the time spent for the task.
+        Only works for the task detail which was just created.
+        The timer is stopped when the task is changed.
+        """
+        self.set_end_time( get_ts() )
 
         # Schedule the next update after 60 seconds
         if self.count_time:

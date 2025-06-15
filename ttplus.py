@@ -143,8 +143,6 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import PhotoImage
 
-from datetime import datetime
-
 from mod_table import TableWidget
 import const
 
@@ -152,6 +150,7 @@ from mod_db import Database
 from mod_about import AboutDialog
 from mod_detaileditor import TaskDetailEditor
 
+from util.mod_ts import *
 
 # Task 1
 ## Design the Time Tracker
@@ -189,7 +188,8 @@ def populate_table1():
 
 def generate_task_id():
     """Generate a unique Task ID based on the current timestamp."""
-    return datetime.now().strftime("%Y%m%d%H%M%S")
+    from datetime import datetime
+    return datetime.now().strftime(FMT_LONG)
 
 def generate_short_task_id(full_task_id, length=5):
     """Generate a shorter, hashed version of the Task ID."""
@@ -227,8 +227,6 @@ def extract_items(data_dict, index_list):
             l.append(data_dict[str(index)][0].copy())
     return l
 
-def dm_hm(ts):
-    return ts[6:8] + "." + ts[4:6] +" "+ ts[8:10] + ":" + ts[10:12]
 
 def subst_timestamp(l):
     # l is a list with task_details
@@ -334,7 +332,6 @@ def update_task_name(event=None):
                 # create list of task detail items
                 database["task_details"][task_id] = []
 
-                #    {"Start Time": current_time(), "End Time": "", "What was done": "add detail ..."}]
                 # create new task id and use it for the placeholder
                 task_placeholder_id = add_new_task_placeholder()
             else:
@@ -541,14 +538,12 @@ def calculate_total_work_time(task_id):
     Returns:
         str: Total work time in "HH:MM" format.
     """
-    from datetime import datetime
-
     detail_list = database["task_details"].get(task_id, [])
     total_minutes = 0
     for detail in detail_list:
         try:
-            tss = datetime.strptime(detail["Start Time"], "%Y%m%d%H%M%S")
-            tse = datetime.strptime(detail["End Time"], "%Y%m%d%H%M%S")
+            tss = dt_str(detail["Start Time"])
+            tse = dt_str(detail["End Time"])
             delta = tse - tss
             total_minutes += delta.seconds // 60
         except Exception:
@@ -620,7 +615,7 @@ def on_table2_select(event):
                 "Timekeeping earliest date " + # earliest_date
                 tracker.tw_report(database["task_details"]).strftime('%d.%m.%Y')
             )
-            db_sts = datetime.strptime(d_entry["Start Time"], "%Y%m%d%H%M%S")
+            db_sts = dt_str(d_entry["Start Time"])
             status_bar. s_act(
                 db_sts, 
                 tracker.check_deviation(d_entry)
@@ -644,10 +639,6 @@ def on_table2_select(event):
             tde.run_clock()
 
         tde.load_data( d_entry )
-
-# Get current time in HH:MM format
-def current_time():
-    return datetime.now().strftime("%H:%M")
 
 def show_about():
     AboutDialog(master=root)
@@ -693,8 +684,8 @@ def show_task_report():
     print("---:---------------------------")
     for dict in l:
         # get timestamps
-        tss = datetime.strptime(dict["Start Time"], "%Y%m%d%H%M%S")
-        tse = datetime.strptime(dict["End Time"],   "%Y%m%d%H%M%S")
+        tss = get_dt(dict["Start Time"])
+        tse = get_dt(dict["End Time"])
         # Compute difference
         delta = tse - tss
         # Format difference in hh:mm

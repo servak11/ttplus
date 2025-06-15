@@ -12,6 +12,12 @@ These actions are noted during usage
   -- rename "End Time"      to "et"
   -- rename "What was done" to "wd"
   -- rename "note"          to "nt"
+- merge various timesheets
+- mark recent tasks and filter them - only display those for quick access
+  (when timesheet large, boresome to scroll from the top every start)
+- deviation tab to easy assign tasks
+- issue - have seen sudden crash when creating new task, clicked on new task before ...
+
 
 By implementing these improvements, you can significantly enhance the code quality and structure of your project. Let me know if you'd like help with any specific aspect!
 
