@@ -23,9 +23,9 @@
 #   "note": "Here note detail full detail including hyperlinks highlighting"
 #
 import tkinter as tk
-from util.mod_ts import *
-from mod_timespin import TimeSpinControl
-from mod_datelabel import DateLabel
+from util.ts import *
+from controls.timespin import TimeSpinControl
+from controls.datelabel import DateLabel
 
 import webbrowser
 import re
@@ -203,11 +203,14 @@ class TaskDetailEditor(tk.LabelFrame):
     def set_callback(self, update_task_details_method):
         self.callback = update_task_details_method
 
-    # provide callback to the date control to return changed date here
-    # new_date shall be returned in format strftime("%Y%m%d")
     def update_detail_date(self, new_date):
+        """
+        # provide callback to the date control to return changed date here
+        # new_date shall be returned in format strftime("%Y%m%d")
+        or just as normal long timestamp
+        """
         if self.date_control.date_changed:
-            # take changed timestamp
+            # take the date from the changed timestamp
             d = new_date[:8]
             # and add it to the start and end times
             self.d1["Start Time"]           = d + self.d1["Start Time"] [8:]
@@ -271,7 +274,7 @@ class TaskDetailEditor(tk.LabelFrame):
             self.first_line.pack(fill="x", padx=5, pady=5)  # Repack the frame (unhide)
             self._enable_widgets(self.first_line)
             self._enable_widgets(self.second_line)
-            self._enable_widgets(self.date_control.first_line)
+            self._enable_widgets(self.date_control.frm)     # frame of date control
             # populate date control
             # - the timestamp is now controlled in the date_control
             # TODO when pressed unlock date, shall the time spins be disabled?

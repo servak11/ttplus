@@ -8,6 +8,7 @@ timestamp : str
 from datetime import datetime
 
 FMT_LONG = "%Y%m%d%H%M%S"
+FMT_DATE = "%d.%m.%Y"
 
 def dm_hm(ts):
     """
@@ -33,7 +34,7 @@ def get_dt(ts):
     """
     return datetime.strptime( ts, FMT_LONG)
 
-def get_ts(dt=None):
+def get_ts( dt = None, fmt = FMT_LONG):
     """
     Return time in "long" format, a text timestamp
 
@@ -41,8 +42,8 @@ def get_ts(dt=None):
         ts (str): timestamp
 
     Returns:
-        str: date andtime in FMT_LONG
+        str: date and time in FMT_LONG
     """
     if dt == None:
         dt = datetime.now()
-    return dt.strftime(FMT_LONG)
+    return dt.strftime(fmt)

@@ -1,21 +1,56 @@
-## ttplus - work time tracker
-#
+"""
+ttplus project - work time tracker
+
 ## The Time Spin control
-#
-# class TimeSpinControl(ttk.Spinbox):
-#   the spin control for editing hours or minutes shall allow changing the integer value it shows from 0 to a given maximum
-#   with rollover to 0, after reaching that maximumm and spinning up
-#   the spin control shall have width of 4
-#   the text in all the control shall be confined to contain only 2 digits,
-#   also when editing the text per keyboard,
-#   if the number is less than 10, it shall display a leading 0, e.g. "01"
-#   the text selection background color in all spin controls shall be lightblue
+
+This module implements a specialized spin control for time input in the ttplus application.
+It provides a TimeSpinControl class that extends ttk.Spinbox to handle time input with
+specific formatting and validation requirements.
+
+Location:
+    ./controls/timespin.py - Part of the controls package for ttplus UI components
+
+Key Features:
+- Two-digit display with leading zeros (e.g. "01" for 1)
+- Value wrapping when reaching maximum/minimum
+- Keyboard and arrow key navigation
+- Automatic value validation and formatting
+- Configurable maximum value (typically 23 for hours, 59 for minutes)
+- The spin control shall have width of 4
+"""
 
 import tkinter as tk
 from tkinter import ttk
 
 class TimeSpinControl(ttk.Spinbox):
+    """A specialized Spinbox control for time input (hours/minutes).
+
+    This control enforces two-digit display with leading zeros and implements
+    wrapping behavior when incrementing/decrementing values.
+
+    Attributes:
+        min_value (int): Minimum allowed value (always 0)
+        max_value (int): Maximum allowed value (23 for hours, 59 for minutes)
+
+    Args:
+        parent: The parent widget
+        max_value (int): Maximum value for the control (23 for hours, 59 for minutes)
+        **kwargs: Additional keyword arguments passed to ttk.Spinbox
+    """
     def __init__(self, parent, max_value, **kwargs):
+        """Initialize the TimeSpinControl.
+
+        Args:
+            parent: The parent widget
+            max_value (int):    Maximum value for the spinbox
+                                (typically 23 for hours or 59 for minutes)
+            **kwargs: Additional configuration options passed to ttk.Spinbox
+
+        Raises:
+            ValueError: If max_value is not a positive integer
+        """
+        if not isinstance(max_value, int) or max_value <= 0:
+            raise ValueError("max_value must be a positive integer")
         super().__init__(parent, **kwargs)
         
         # Set the maximum and minimum values

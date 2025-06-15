@@ -147,10 +147,9 @@ from mod_table import TableWidget
 import const
 
 from mod_db import Database
-from mod_about import AboutDialog
 from mod_detaileditor import TaskDetailEditor
 
-from util.mod_ts import *
+from util.ts import *
 
 # Task 1
 ## Design the Time Tracker
@@ -542,8 +541,8 @@ def calculate_total_work_time(task_id):
     total_minutes = 0
     for detail in detail_list:
         try:
-            tss = dt_str(detail["Start Time"])
-            tse = dt_str(detail["End Time"])
+            tss = get_dt(detail["Start Time"])
+            tse = get_dt(detail["End Time"])
             delta = tse - tss
             total_minutes += delta.seconds // 60
         except Exception:
@@ -615,7 +614,7 @@ def on_table2_select(event):
                 "Timekeeping earliest date " + # earliest_date
                 tracker.tw_report(database["task_details"]).strftime('%d.%m.%Y')
             )
-            db_sts = dt_str(d_entry["Start Time"])
+            db_sts = get_dt(d_entry["Start Time"])
             status_bar. s_act(
                 db_sts, 
                 tracker.check_deviation(d_entry)
@@ -641,6 +640,7 @@ def on_table2_select(event):
         tde.load_data( d_entry )
 
 def show_about():
+    from controls.about import AboutDialog
     AboutDialog(master=root)
 
 def show_report():
