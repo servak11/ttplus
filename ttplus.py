@@ -578,38 +578,61 @@ def on_table2_select(event):
     Returns:
         None
     """
+    # check if selection was done
+    selected_detail = table2.selection()
+    if not selected_detail:
+        # if no selection, no action!
+        # this can happen when table populated but no selection done
+        #print ("check: new load - nothing selected in table2 !")
+        return
+
+    # stop detail timer and clear details before load new data
     tde.stop_clock()
     tde.clear_note()
-    selected_item = table2.selection()
-    if selected_item:
-        ### Find data and Load the Detail Editor
-        # find index of current note in the database
-        task_id = table1.item(table1.selection(), "values")[0]
-        # get index of current detail in the table2
-        detail_index = table2.index(selected_item[0])
-        status_bar.s_set("Selected task detail #",detail_index," of task ",task_id)
 
-        # calculate_total_work_time(task_id), format as HH:MM
-        twt = calculate_total_work_time(task_id)
+    ### Find data and Load the Detail Editor
+    # find index of current note in the database
+    task_data = list(table1.item(table1.selection(), "values"))
+    task_id = task_data[0] ### table1.item(table1.selection(), "values")[0]
+    # get index of current detail in the table2
+    detail_index = table2.index(selected_detail[0])
+    status_bar.s_set("Selected task detail #", detail_index," of task ",task_id)
 
-        # Update database and table1
-        database["work_tasks"][task_id]["twt"] = twt
+    # calculate_total_work_time(task_id), format as HH:MM
+    # update database and the "Total work time" column
+    twt = calculate_total_work_time(task_id)
+    database["work_tasks"][task_id]["twt"] = twt
+    task_data[2] = twt # (assuming it's the 3rd column, index 2)
+    table1.item(table1.selection(), values=task_data)
 
-        # Find the item in table1
-        # and update the "Total work time" column
-        # (assuming it's the 3rd column, index 2)
-        values = list(table1.item(table1.selection(), "values"))
-        values[2] = twt
-        table1.item(table1.selection(), values=values)
+    task_detail_list = database["task_details"].get(task_id, [])
+    do_timetracking = False
+    if 0 <= detail_index < len(task_detail_list):
+        # get full record of the details
+        d_entry = database["task_details"].get(task_id)[detail_index]
+        do_timetracking = True
+    else:
+        ### in case of placeholder the data would not load
+        # and the record for new entry need to be generated
+        #
+        # Attention! In the database the entry would only be created
+        # after on_change() triggered in details editor
+        # -> that would trigger update_task_details()
+        #
+        id = generate_task_id()
+        d_entry = {
+            "Start Time"    : id,
+            "End Time"      : id,
+            "What was done" : "add detail ..."
+        }
+        tde.run_clock()
 
-        try:
-            # get full record of the details
-            d_entry = database["task_details"].get(task_id)[detail_index]
-            # this is the place to match the tde entry with timetracking
-            # and update status
-            from mod_timetrack import TimeTracking
-            tracker = TimeTracking()
-            # TODO move this to TimeTracking task
+    if do_timetracking or 0:
+        from mod_timetrack import TimeTracking
+        tracker = TimeTracking()
+        # Do some statistics?
+        # TODO move this to TimeTracking task
+        if 0:
             status_bar. s_set(
                 "Timekeeping earliest date " + # earliest_date
                 tracker.tw_report(database["task_details"]).strftime('%d.%m.%Y')
@@ -620,24 +643,11 @@ def on_table2_select(event):
                 tracker.check_deviation(d_entry)
             )
 
-            # If the task was overdue, display a red status message
-            #if time_diff_minutes != 0:
-            #    status_bar.s_set(datetime.strptime(closest_dt, "%d.%m.%Y%H:%M"))
-        except IndexError:
-            ### in case of placeholder the data would not load
-            #d_entry = None # NO!!! create new entry already?
-            # Attention! In the database the entry would only be created
-            # after on_change() triggered in details editor
-            # -> that would trigger update_task_details()
-            id = generate_task_id()
-            d_entry = {
-                "Start Time"    : id,
-                "End Time"      : id,
-                "What was done" : "add detail ..."
-            }
-            tde.run_clock()
+        # If the task was overdue, display a red status message
+        #if time_diff_minutes != 0:
+        #    status_bar.s_set(datetime.strptime(closest_dt, "%d.%m.%Y%H:%M"))
 
-        tde.load_data( d_entry )
+    tde.load_data( d_entry )
 
 def show_about():
     from controls.about import AboutDialog
@@ -787,5 +797,7 @@ tde.set_callback(update_task_details)
 #tde.notes.bind("<KeyRelease>", update_task_note)
 #tde.notes.bind("<KeyRelease>", update_task_note)
 
-
-root.mainloop()
+try:
+    root.mainloop()
+except KeyboardInterrupt:
+    pass
