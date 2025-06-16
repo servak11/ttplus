@@ -59,49 +59,48 @@ class TimeSpinControl(ttk.Spinbox):
         
         # Configure the Spinbox
         self.configure(
-            from_=self.min_value,
-            to=self.max_value,
-            wrap=True,
-            width=4,
-            justify="center",
-            exportselection=0,  # Ensure selection works as expected
-            font=("Verdana", 12)  # Use Verdana font, size 14
-            #selectbackground="lightblue"  # Set the text selection background color
+            from_   = self.min_value,
+            to      = self.max_value,
+            wrap    = True,
+            width   = 4,
+            justify = "center",
+            exportselection = 0,
+            font    = ("Verdana", 12),
+            background = "lightblue"
         )
-        
-        # Initialize value
-        self.insert(0, "00")
-        
+
         # Bind events for proper handling
         self.bind("<FocusOut>", self._on_focus_out)
         self.bind("<KeyRelease>", self._on_key_release)
-        self.bind("<Up>", self._increment)
-        self.bind("<Down>", self._decrement)
+
 
     def _on_focus_out(self, event):
         """Ensure value is two-digit and within range when focus is lost."""
         self._validate_and_format()
+        # assume finished editing because focus out
+        value = self.get()
+        if len(value) < 1:
+            self.insert(0, "00") # convert empty to 0
+        else:
+            if len(value) < 2:
+                self.insert(0, "0") # insert leading 0
 
     def _on_key_release(self, event):
         """Ensure value is formatted properly while typing."""
         self._validate_and_format()
 
-    def _increment(self, event):
-        """Handle the increment (Up arrow)."""
-        current_value = int(self.get())
-        next_value = current_value + 1 if current_value < self.max_value else self.min_value
-        self.delete(0, "end")
-        self.insert(0, f"{next_value:02d}")
-
-    def _decrement(self, event):
-        """Handle the decrement (Down arrow)."""
-        current_value = int(self.get())
-        next_value = current_value - 1 if current_value > self.min_value else self.max_value
-        self.delete(0, "end")
-        self.insert(0, f"{next_value:02d}")
-
     def _validate_and_format(self):
         """Ensure value is within range and properly formatted."""
+        value = self.get()
+        if not value.isdigit():
+            self.delete(0, "end")
+        if value.isdigit():
+            if len(value) > 2: # 3rd digit 
+                # when 2 digits already entered, then third typed digit would appear
+                # assume the new number shall be entred, so remove old number
+                # and leave only 1 new digit
+                self.delete(0, "end")
+                self.insert(0, value[2:] ) # display last digit, assuming user enters new number
         value = self.get()
         if value.isdigit():
             value = int(value)
@@ -112,8 +111,9 @@ class TimeSpinControl(ttk.Spinbox):
         else:
             value = self.min_value
         # Ensure two-digit formatting
-        self.delete(0, "end")
-        self.insert(0, f"{value:02d}")
+        if not value < 10:
+            self.delete(0, "end")
+            self.insert(0, f"{value:02d}")
 
 # Example usage
 if __name__ == "__main__":
