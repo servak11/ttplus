@@ -1,5 +1,6 @@
 import json
 from datetime import datetime
+from util.ts import *
 
 # work with TimeTracking app or web to obtain tracking data via bridge
 class TimeTracking:
@@ -10,28 +11,31 @@ class TimeTracking:
 
 
 
+    def tw_report(self, db, empty_project_only=False):
+        """
+        Process and store timekeeping data, generating a reference list for comparison
+        between timekeeping and ttplus entries.
 
-    # obtain the timekeeping data
-    # and store the list of reference data 
-    # 
-    # self.timetrack_deviation
-    # - the reference array of tuples composed in this routine
-    # - contains timetracking entry, the closest ttplus entry for it,
-    #   the difference in minutes and the parent task of the ttplus entry
-    #
-    # when a note detail opened
-    # compare its start date with the reference data
-    # find nearest timekeeping entry
-    # display the status in the activity status
-    # - yellow no data
-    # - green start date and time match
-    # - red start date and time msmatch (by minutes)
-    #
-    # @param db json database from ttplus
-    # @param empty_project_only if True, only stores the timetrack
-    #       with empty project entry in the reference
-    # @return earliest_date the records are missing entries
-    def tw_report( self, db, empty_project_only = False):
+        This method constructs `self.timetrack_deviation`, a list of tuples with:
+            - The timekeeping entry.
+            - The closest ttplus entry.
+            - The difference in minutes between the entries.
+            - The parent task of the ttplus entry.
+
+        When a note detail is opened, the method compares its start date to the reference data,
+        finds the nearest timekeeping entry, and determines the activity status:
+            - Yellow: no data available.
+            - Green: start date and time match.
+            - Red: start date and time mismatch (by minutes).
+
+        Args:
+            db (dict): The ttplus database containing task details, loaded from JSON.
+            empty_project_only (bool, optional): If True, only timetrack entries with empty project fields
+                are stored in the reference data. Defaults to False.
+
+        Returns:
+            datetime or None: The earliest date among records missing entries, or None if all records are complete.
+        """
         json_data = {}
         timetrack_list = []
         if 0:
@@ -45,13 +49,13 @@ class TimeTracking:
             import os
             if os.path.exists("tw_data.json"):
                 with open("tw_data.json", "r") as json_file:
-                    timetrack_list = json.load(json_file)
+                    json_data = json.load(json_file)
             else:
                 json_data = {
                     "header" : {},
                     "records": {}
                 }
-                timetrack_list = json_data["records"]
+            timetrack_list = json_data["records"]
 
         #for row in timetrack_list:
         #    #for inf in row:
@@ -217,7 +221,7 @@ class TimeTracking:
             return None  # No tracking data available
 
         # string to datetime
-        db_sts = datetime.strptime(d_entry["Start Time"], "%Y%m%d%H%M%S")
+        db_sts = get_dt(d_entry["Start Time"])
 
         # Find matching tuple for d_entry["Start Time"]
         for track_ts, db_ds, time_diff_minutes, task_id in self.timetrack_deviation:
@@ -260,7 +264,6 @@ if __name__ == "__main__":
 
     def tostr(dt):
         return dt.strftime("%Y%m%d%H%M%S")
-
 
     print(
         "Timekeeping earliest date " + # earliest_date
