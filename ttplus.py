@@ -627,12 +627,12 @@ def on_table2_select(event):
         }
         tde.run_clock()
 
-    if do_timetracking or 0:
+    if do_timetracking:
         from mod_timetrack import TimeTracking
         tracker = TimeTracking()
         # Do some statistics?
         # TODO move this to TimeTracking task
-        if 0:
+        if 1:
             status_bar. s_set(
                 "Timekeeping earliest date " + # earliest_date
                 tracker.tw_report(database["task_details"]).strftime('%d.%m.%Y')
