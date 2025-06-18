@@ -70,7 +70,7 @@ class StatusBar(tk.Frame):
                 (deviation_date - task_date).total_seconds() / 60
             )
             self.activity_area.config(
-                text = f"OVERDUE: {task_date}  ({time_diff_minutes})",
+                text = f"OVERDUE: {deviation_date}  ({time_diff_minutes})",
                 fg="red")  # Red for overdue
 
 # Example usage
