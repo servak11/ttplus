@@ -1,10 +1,10 @@
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by       import By
+from selenium.webdriver.common.keys     import Keys
+from selenium.webdriver.chrome.options  import Options
 from selenium.webdriver.remote.webelement import WebElement
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support.ui import Select
+from selenium.webdriver.support.ui      import WebDriverWait
+from selenium.webdriver.support.ui      import Select
 from selenium.webdriver.support import expected_conditions as EC
 
 from dataclasses import dataclass
@@ -14,6 +14,8 @@ import json
 import os
 import time
 from datetime import datetime, timedelta
+
+from util.ts import *
 
 import re
 
@@ -48,6 +50,10 @@ def browse_data(
         driver=None,
         url=None
     ):
+
+    print("---------------------")
+    print("browse_data() started")
+    print("---------------------")
 
     if 0:
         # Set up Edge options for headless mode (no visible window)
@@ -164,7 +170,12 @@ def browse_data(
     # 2. Select the date range
     #
     # Calculate the date two weeks before today
-    new_date = (datetime.today() - timedelta(weeks=2)).strftime("%d.%m.%Y")
+    #new_date = (datetime.today() - timedelta(weeks=3)).strftime("%d.%m.%Y")
+    NUM_WEEKS_BACK = 3
+    new_date = get_ts(
+        (datetime.today() - timedelta(weeks=NUM_WEEKS_BACK)),
+        fmt = FMT_DATE
+    )
 
     # the "to date" is today, leave as is
     # locate the input field for "from date"
@@ -409,23 +420,10 @@ def browse_data(
 
 if __name__ == "__main__":
 
-    ttdb = "tw_data.json"
-
-    # Load JSON data - old format
-    with open(ttdb, "r", encoding="utf-8") as file:
-        records = json.load(file)
-
-
-    # Check if the file exists
-    if os.path.exists(ttdb):
-        # Read the JSON data
-        with open(ttdb, "r", encoding="utf-8") as file:
-            data = json.load(file)
-        
-        # Extract records from JSON structure
-        records = data.get("records", [])
-
-        # Convert date and time to datetime objects
+    # loop through records and print range
+    # - earliest
+    # - latest date
+    def analyze_timtrack_records(records):
         timestamps = []
         for row in records:
             date_str    = row[1] # Example: "Do, 22.05.2025"
@@ -435,11 +433,12 @@ if __name__ == "__main__":
             # Parse date ignoring day name (split by comma and take the second part)
             date_part = date_str[2:]
 
+            # Convert date and time to datetime objects
             # Combine date and time
             format = "%H:%M, %d.%m.%Y"
-            start_dt = datetime.strptime( start_time + date_part, format)
-            end_dt   = datetime.strptime( end_time   + date_part, format)
-            
+            start_dt = get_dt( start_time + date_part, format )
+            end_dt   = get_dt( end_time   + date_part, format )
+
             # Add both timestamps to the list
             # .extend() is more efficient when adding multiple items at once
             timestamps.extend([start_dt, end_dt])
@@ -451,49 +450,103 @@ if __name__ == "__main__":
         print(f"Earliest timestamp: {earliest}")
         print(f"Latest   timestamp: {latest}")
 
+        return (earliest, latest)
+
+    ttdb = "tw_data.json"
+
+    # Load JSON data - old format
+    with open(ttdb, "r", encoding="utf-8") as file:
+        records = json.load(file)
+
+    tw_data = {}
+    # Check if the file exists
+    if os.path.exists(ttdb):
+        # Read the JSON data
+        with open(ttdb, "r", encoding="utf-8") as file:
+            tw_data = json.load(file)
+        
+        # Extract records from JSON structure
+        records = tw_data.get("records", [])
+
+        analyze_timtrack_records(records)
+
     else:
         print(f"File '{ttdb}' does not exist.")
 
-###
-
+    ### test
+    #print (records[0])
 
     db_updated = 0
-    if 0:
+    if 1:
         # TODO use the latest day to set the date in browse from which start browsing
         timetrack_list = browse_data()
         db_updated = 1
-        # TODO append timetrack_list to the loaded list of records
     else:
         print("skip browse_data()")
         timetrack_list = records
 
+    ### test
+    #print (timetrack_list[0])
+    (earliest, latest) = analyze_timtrack_records(timetrack_list)
+
+    # At this point 
+    # - the list of "records" contains outdated information
+    # - the list of "timetrack_list" contains new information from tisoware
+    # Proceedure:
+    # - go through the list "records" and remove all records
+    #   which have exactly same date (column "Date") and time (column "Start Time")
+    #   as the records in the "timetrack_list"
+    # 
+    # Filter directly within the list comprehension
+    filtered_records = [
+        r for r in records
+        if (r[1], r[2]) not in [(t[1], t[2]) for t in timetrack_list]
+    ]
+    # forget old list
+    records = filtered_records
+    print ("There are", len(records), "records after filtering.")
+    print ("Adding", len(timetrack_list), "records from browse_data().")
+    k = len(records) + 1
+    for t in timetrack_list:
+        t[0] = f"{k:>5}:"  # update row number
+        k = k + 1
+
     if db_updated:
         # save time tracking data to file
         print("export data to database", ttdb)
-        # Define header of the file with comments about the record structure
-        header_info = {
-            "description": "This file contains time-tracking records imported from tisoware.",
-            "fields": [
-                "Record No (str): Unique identifier for each entry '   NN.'",
-                "Date (str): The date of work",
-                "Start Time (str): Time when work started",
-                "End Time (str): Time when work ended",
-                "Project Key (str): Identifier for the project",
-                "Comment (str): Notes about the work",
-                "Project Item (str): Subcategory of the project"
-            ],
-            "generated_on": datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "date range": f"{earliest} - {latest}"
-        }
-        # Combine header and records into a structured JSON file
-        json_data = {
-            "header": header_info,
-            "records": timetrack_list
-        }
+        if not "header" in tw_data:
+            # Define header of the file with comments about the record structure
+            header_info = {
+                "description": "This file contains time-tracking records imported from tisoware.",
+                "fields": [
+                    "Record No (str): Unique identifier for each entry '   NN.'",
+                    "Date (str): The date of work",
+                    "Start Time (str): Time when work started",
+                    "End Time (str): Time when work ended",
+                    "Project Key (str): Identifier for the project",
+                    "Comment (str): Notes about the work",
+                    "Project Item (str): Subcategory of the project"
+                ],
+                "generated_on": get_ts(datetime.now(), fmt=FMT_DATE),
+                "date range": f"{earliest} - {latest}"
+            }
+            # Combine header and records into a structured JSON file
+            #json_data = {
+            #    "header": header_info,
+            #    "records": timetrack_list
+            #}
+            # add header if missing
+            tw_data["header"] = header_info
+        else:
+            tw_data["header"]["updated_on"] = get_ts(datetime.now(), fmt=FMT_DATE)
+            tw_data["header"]["date range"] = f"{earliest} - {latest}"
+
+        # combine the lists
+        tw_data["records"] = records + timetrack_list
 
         # Save to JSON file
         with open(ttdb, "w", encoding="utf-8") as json_file:
-            json.dump(json_data, json_file, indent=2)
+            json.dump( tw_data, json_file, indent=2)
 
         print(f"Timetracking info stored to JSON file '{ttdb}'")
     else:
@@ -506,7 +559,7 @@ if __name__ == "__main__":
     else:
         print(f"Database '{ttdb}' found - will show in GUI")
 
-    if db_updated:
+    if db_updated and 0:
         # Re-read the database
         # 
         # I have json file 
@@ -541,19 +594,32 @@ if __name__ == "__main__":
     root.geometry("1200x600")  # Set window size to 800x600 pixels
 
     # Create a Treeview widget for the table
-    columns = ("Record No", "Date", "Start Time", "End Time", "Project Key", "Comment", "Project Item")
-    tree = ttk.Treeview(root, columns=columns, show="headings")
+    #column_names = ("Record No", "Date", "Start Time", "End Time", "Project Key", "Comment", "Project Item")
+    # list comprehension and string manipulation
+    # to extract the field names from the header_info["fields"] list:
+    header_info = tw_data["header"]
+    column_names = [field.split("(str)")[0].strip() for field in header_info["fields"]]
+    tree = ttk.Treeview(root, columns=column_names, show="headings")
 
     # Define column widths (first 4 narrow, last 3 wide)
     column_widths = [60, 100, 80, 80, 200, 250, 250]
 
-    for col, width in zip(columns, column_widths):
+    for col, width in zip(column_names, column_widths):
         tree.heading(col, text=col)
         tree.column(col, width=width)
 
     # Insert records into the table
     for record in records:
         tree.insert("", tk.END, values=record)
+
+
+    # they insert in black color
+    # now I need to insert new records from the timetrack_list
+    # but display them in blue color
+    # Define the tag with blue foreground
+    tree.tag_configure("blue_text", foreground="blue")
+    for record in timetrack_list:
+        tree.insert("", tk.END, values=record, tags=("blue_text",))
 
     # Create a right-click menu
     menu = tk.Menu(root, tearoff=0)
