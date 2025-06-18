@@ -13,7 +13,8 @@ class TimeTracking:
 
     def tw_report(self, db, empty_project_only=False):
         """
-        Process and store timekeeping data, generating a reference list for comparison
+        Process and store timekeeping data,
+        generating a reference list for comparison
         between timekeeping and ttplus entries.
 
         This method constructs `self.timetrack_deviation`, a list of tuples with:
@@ -29,12 +30,15 @@ class TimeTracking:
             - Red: start date and time mismatch (by minutes).
 
         Args:
-            db (dict): The ttplus database containing task details, loaded from JSON.
-            empty_project_only (bool, optional): If True, only timetrack entries with empty project fields
+            db (dict):
+                The ttplus database containing task details, loaded from JSON.
+            empty_project_only (bool, optional):
+                If True, only timetrack entries with empty project fields
                 are stored in the reference data. Defaults to False.
 
         Returns:
-            datetime or None: The earliest date among records missing entries, or None if all records are complete.
+            datetime or None: The earliest date among records missing entries,
+            or None if all records are complete.
         """
         json_data = {}
         timetrack_list = []
