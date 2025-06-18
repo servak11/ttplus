@@ -22,7 +22,7 @@ def dm_hm(ts):
     """
     return ts[6:8] + "." + ts[4:6] +" "+ ts[8:10] + ":" + ts[10:12]
 
-def get_dt(ts):
+def get_dt(ts, fmt = FMT_LONG):
     """
     Return datetime object for the timestamp
 
@@ -32,17 +32,19 @@ def get_dt(ts):
     Returns:
         datetime: datetime object
     """
-    return datetime.strptime( ts, FMT_LONG)
+    return datetime.strptime( ts, fmt)
 
 def get_ts( dt = None, fmt = FMT_LONG):
     """
     Return time in "long" format, a text timestamp
 
     Parameters:
-        ts (str): timestamp
+        dt (datetime): datetime
+        fmt (bool, optional): format string (FMT_LONG, FMT_DATE, ...).
+            Default FMT_LONG
 
     Returns:
-        str: date and time in FMT_LONG
+        str: date and time in selected format
     """
     if dt == None:
         dt = datetime.now()
