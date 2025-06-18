@@ -179,14 +179,16 @@ class TimeTracking:
         #   the tuple from self.timetrack_deviation which d_entry["Start Time"]
         #   is equal to dt1 in the tuple
         #
-        # Print results
-        if 0:
-            print("TIMEKEEPING          ➝  TTPLUS  closest      | Difference")
-            for original, closest, diff, task_id in self.timetrack_deviation:
-                print(f"{original}  ➝  {closest}  | Difference: {diff:>4} minutes")
 
         return (earliest_date)
 
+
+    def print_timetrack_deviation(self):
+        """Print results of this module's work - timetrack_deviation array"""
+        print("TIMEKEEPING          ➝  TTPLUS  closest      | Difference")
+        for original, closest, diff, task_id in self.timetrack_deviation:
+            print(f"{original}  ➝  {closest}  | Difference: {diff:>4} minutes")
+        print("TIMEKEEPING          ➝  TTPLUS  closest      | Difference")
 
         # Specification of Timetracking in TTPLUS.
         #
@@ -241,7 +243,6 @@ class TimeTracking:
         return None #"No matching entry found"  # Handle cases where no match exists
 
 
-
 # Test
 if __name__ == "__main__":
 
@@ -250,54 +251,62 @@ if __name__ == "__main__":
     db = Database()
     database = db.load_data()
 
+    # Example usage.
     tracker = TimeTracking()
 
-    def mod_timetrack_test(d_entry):
-        # Find deviation returns datetime from tracker db
-        track_ts = tracker.check_deviation(d_entry)
-        if None == track_ts:
-            return "No matching entry found"  # Handle cases where no match exists
+    # tw_report() constructs the `self.timetrack_deviation` list
+    # and returns earliest_date in the history of deviations
+    earliest_date = tracker.tw_report(database["task_details"])
 
-        db_sts = datetime.strptime(d_entry["Start Time"], "%Y%m%d%H%M%S")
-        time_diff_minutes = int((track_ts - db_sts).total_seconds() / 60)
-
-        if time_diff_minutes != 0:
-            return f"OVERDUE: {db_sts.strftime('%d.%m.%Y %H:%M')} ({time_diff_minutes})"
-        else:
-            return f"ON TIME: {db_sts.strftime('%d.%m.%Y %H:%M')}"
-
-    def tostr(dt):
-        return dt.strftime("%Y%m%d%H%M%S")
+    tracker.print_timetrack_deviation()
 
     print(
-        "Timekeeping earliest date " + # earliest_date
-        tracker.tw_report(database["task_details"]).strftime('%d.%m.%Y')
+        "Timekeeping earliest date "
+        + get_ts( earliest_date, fmt=FMT_DATE)
     )
 
-    print()
-    print("*** Test 1. Check arbitrary date")
-    # normally using the database this shall not happen
-    # as deviation always calculated to the existing d entry
-    # but this is the test
-    d_entry = {"Start Time": tostr(datetime(2025, 6, 1, 10, 0))}
-    print(d_entry)
-    print("  -" + mod_timetrack_test(d_entry))
+    if 0: ### TEST ###
+        def mod_timetrack_test(d_entry):
+            # Find deviation returns datetime from tracker db
+            track_ts = tracker.check_deviation(d_entry)
+            if None == track_ts:
+                return "No matching entry found"  # Handle cases where no match exists
+
+            db_sts = datetime.strptime(d_entry["Start Time"], "%Y%m%d%H%M%S")
+            time_diff_minutes = int((track_ts - db_sts).total_seconds() / 60)
+
+            if time_diff_minutes != 0:
+                return f"OVERDUE: {db_sts.strftime('%d.%m.%Y %H:%M')} ({time_diff_minutes})"
+            else:
+                return f"ON TIME: {db_sts.strftime('%d.%m.%Y %H:%M')}"
+
+        def tostr(dt):
+            return dt.strftime("%Y%m%d%H%M%S")
+
+        print()
+        print("*** Test 1. Check arbitrary date")
+        # normally using the database this shall not happen
+        # as deviation always calculated to the existing d entry
+        # but this is the test
+        d_entry = {"Start Time": tostr(datetime(2025, 6, 1, 10, 0))}
+        print(d_entry)
+        print("  -" + mod_timetrack_test(d_entry))
 
 
-    print()
-    print("*** Test 2. Check deviation date")
-    d_entry = {"Start Time": tostr(datetime(2025, 5, 28, 6, 3, 16))}
-    print("  -" + mod_timetrack_test(d_entry))
+        print()
+        print("*** Test 2. Check deviation date")
+        d_entry = {"Start Time": tostr(datetime(2025, 5, 28, 6, 3, 16))}
+        print("  -" + mod_timetrack_test(d_entry))
 
 
-    print()
-    print("*** Test 3. Check match date")
-    d_entry = {"Start Time": tostr(datetime(2025, 5, 28, 9, 57))}
-    print("  -" + mod_timetrack_test(d_entry))
+        print()
+        print("*** Test 3. Check match date")
+        d_entry = {"Start Time": tostr(datetime(2025, 5, 28, 9, 57))}
+        print("  -" + mod_timetrack_test(d_entry))
 
-    print()
-    print("*** Test 4. Large unmatch")
+        print()
+        print("*** Test 4. Large unmatch")
 
-    d_entry = {"Start Time": tostr(datetime(2025, 5, 30, 8, 57, 38))}
-    print(d_entry)
-    print("  -" + mod_timetrack_test(d_entry))
+        d_entry = {"Start Time": tostr(datetime(2025, 5, 30, 8, 57, 38))}
+        print(d_entry)
+        print("  -" + mod_timetrack_test(d_entry))
