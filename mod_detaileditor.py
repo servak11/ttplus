@@ -50,15 +50,16 @@ class TaskDetailEditor(tk.LabelFrame):
         self.note_loaded = False
 
         # Bind events for all controls
+        # Note. (add="+") is used to prevent overwrite of TimeSpinControl validation
         self.task_detail.bind("<KeyRelease>", self._on_change)
         self.notes.bind("<KeyRelease>", self._on_change)
-        self.start_hour.bind("<KeyRelease>", self._on_change)
+        self.start_hour.bind("<KeyRelease>", self._on_change, add="+")
         self.start_hour.bind("<ButtonRelease-1>", self._on_change)
-        self.start_minute.bind("<KeyRelease>", self._on_change)
+        self.start_minute.bind("<KeyRelease>", self._on_change, add="+")
         self.start_minute.bind("<ButtonRelease-1>", self._on_change)
-        self.end_hour.bind("<KeyRelease>", self._on_change)
+        self.end_hour.bind("<KeyRelease>", self._on_change, add="+")
         self.end_hour.bind("<ButtonRelease-1>", self._on_change)
-        self.end_minute.bind("<KeyRelease>", self._on_change)
+        self.end_minute.bind("<KeyRelease>", self._on_change, add="+")
         self.end_minute.bind("<ButtonRelease-1>", self._on_change)
 
     def _create_note_detail_head(self):
@@ -102,6 +103,7 @@ class TaskDetailEditor(tk.LabelFrame):
         #self.task_detail.config(state=tk.DISABLED)
 
         self._disable_widgets(self.first_line)
+        print(self.start_hour.bind()) 
 
     # Get all child widgets in the given frame
     # Check if widget supports config method and disable widget
