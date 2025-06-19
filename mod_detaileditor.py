@@ -103,7 +103,6 @@ class TaskDetailEditor(tk.LabelFrame):
         #self.task_detail.config(state=tk.DISABLED)
 
         self._disable_widgets(self.first_line)
-        print(self.start_hour.bind()) 
 
     # Get all child widgets in the given frame
     # Check if widget supports config method and disable widget
@@ -272,6 +271,8 @@ class TaskDetailEditor(tk.LabelFrame):
         """
         if dict_data:
             self.d1 = dict_data
+            # reset offset to 0
+            self.date_control.reset()
             # Enable editing of selected note
             self.first_line.pack(fill="x", padx=5, pady=5)  # Repack the frame (unhide)
             self._enable_widgets(self.first_line)
@@ -391,8 +392,7 @@ class TaskDetailEditor(tk.LabelFrame):
         d = self.timestamp[:8]  # YYYYMMDD
         h = self.start_hour.get()
         m = self.start_minute.get()
-        #print(f"get_start_time return {d}{h}{m}00")
-        return f"{d}{h}{m}00"
+        return f"{d}{int(h):02}{int(m):02}00"
 
     def set_start_time(self, timestamp):
         self.timestamp = timestamp # remember for return path
@@ -409,7 +409,7 @@ class TaskDetailEditor(tk.LabelFrame):
         d = self.timestamp[:8]  # YYYYMMDD
         h = self.end_hour.get()
         m = self.end_minute.get()
-        return f"{d}{h}{m}00"
+        return f"{d}{int(h):02}{int(m):02}00"
 
     def set_end_time(self, timestamp):
         """ Extract hour and minute from the timestamp """

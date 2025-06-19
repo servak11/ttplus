@@ -30,6 +30,8 @@ class Entry:
     activity:   str
     comment:    str
 
+driver = None
+
 # connect to the webpage
 # select PRZ sheet
 # select and display the span of 2 weeks in the sheet
@@ -47,13 +49,18 @@ class Entry:
 def browse_data(
         #date: str,
         #data: List[Entry],
-        driver=None,
+        #driver=None,
         url=None
     ):
 
     print("---------------------")
     print("browse_data() started")
     print("---------------------")
+
+    # once using global driver variable,
+    # and no headless mode
+    # the browser will stay open until application closes
+    global driver
 
     if 0:
         # Set up Edge options for headless mode (no visible window)
@@ -65,7 +72,7 @@ def browse_data(
 
     #from selenium import webdriver
     edge_options = webdriver.EdgeOptions()
-    edge_options.add_argument("--headless")
+    #edge_options.add_argument("--headless")
     # Improve performance
     edge_options.add_argument("--disable-gpu")  
     edge_options.add_argument("--disable-features=EdgeIdentity")
@@ -418,12 +425,67 @@ def browse_data(
 
             E("netblbuchaend").click()
 
+def update_timetracking( ):
+    global driver
+    if None == driver:
+        return
+    # In the browse_data() - Already SWITCHED to the iframe using its ID !
+    # Create a wait object (again) using the browser driver
+    wait = WebDriverWait(driver, 10)
+
+    # Wait for the erfassung table to appear:
+    table = wait.until(EC.presence_of_element_located((By.ID, "dvTblFLmain")))
+
+    print("---------- update_timetracking")
+    print("Table found:", table.id)
+    # Find all rows inside the table
+    rows = table.find_elements(By.TAG_NAME, "tr")
+    # Get the row count
+    row_count = len(rows)
+    print(f"Number of rows: {row_count}")
+
+    # text input fields need to be filled
+    text_inputs = rows[0].find_elements(By.CSS_SELECTOR, "input[type='text']")
+    inpus_count = len(text_inputs)
+    # Print the IDs of all found input fields
+    inf_list = []
+    for inf in text_inputs:
+        #print(inf.get_attribute("id") + ("-" * 15))
+        inf_list.append( inf.get_attribute("id") )
+    print(f"Writing {inpus_count} text inputs: {inf_list}")
+    k=1
+    # iterate through all rows in the Zeiterfassung HTML table
+    for row in rows:
+        # find all input elements in selected row and add them to info row
+        text_inputs = row.find_elements(By.CSS_SELECTOR, "input[type='text']")
+        if "" == text_inputs[3].get_attribute("value"):
+            # found empty project field
+            print(f"{k:>5}:")  # row number
+            project_key = "9300_2025_Fs-DCP"
+            text_inputs[3].send_keys( project_key )
+            # after the project was selected,
+            # the select control below will be populated
+            # find the select element for "type of work" -- 2nd selector
+            # select.select_by_index(len(select.options) - 1)
+            select_elements = row.find_elements(By.CSS_SELECTOR, "select")
+            select_elements[1].send_keys(Keys.END) # select last option
+        k=k+1
+
+
 if __name__ == "__main__":
 
-    # loop through records and print range
-    # - earliest
-    # - latest date
     def analyze_timtrack_records(records):
+        """
+        Loop through the browser timetracking records,
+        find and return the range of dates.
+        See format of browse_data() output to find record structure.
+        Return: tuple
+            (earliest date of records, latest date of records)
+        """
+        if [] == records:
+            print("analyze_timtrack_records: No records to analyze.")
+            return (None, None)
+
         timestamps = []
         for row in records:
             date_str    = row[1] # Example: "Do, 22.05.2025"
@@ -452,75 +514,95 @@ if __name__ == "__main__":
 
         return (earliest, latest)
 
-    ttdb = "tw_data.json"
 
-    # Load JSON data - old format
-    with open(ttdb, "r", encoding="utf-8") as file:
-        records = json.load(file)
+    def read_timetrack_json(jsonfn):
+        """read database of timetrack records from json file and return as dictionary"""
+        # Check if the file exists
+        if os.path.exists(jsonfn):
+            # Read the JSON data
+            with open(jsonfn, "r", encoding="utf-8") as file:
+                return json.load(file)
+        else:
+            print(f"File '{jsonfn}' does not exist.")
+            return {}
 
-    tw_data = {}
-    # Check if the file exists
-    if os.path.exists(ttdb):
-        # Read the JSON data
-        with open(ttdb, "r", encoding="utf-8") as file:
-            tw_data = json.load(file)
-        
-        # Extract records from JSON structure
-        records = tw_data.get("records", [])
+    def filter_old_records( timetrack_list, records):
+        """
+        Procedure:
+        - go through the list of old "records" and remove all records
+          which have exactly same date (column "Date") and time (column "Start Time")
+          as the records in the "timetrack_list"
+        - update the line numbers in the timetrack_list
 
-        analyze_timtrack_records(records)
+        So this function only retains the old records from the records.
 
-    else:
-        print(f"File '{ttdb}' does not exist.")
+        Args:
+            records - the list of "records" contains outdated information
+            timetrack_list - the list of "timetrack_list" contains new information from tisoware
+        Return:
+            filtered_list - new list - the list which only contains records which are not in the timetrack_list
+        """
+        # Filter directly within the list comprehension
+        filtered_records = [
+            r for r in records
+            if (r[1], r[2]) not in [(t[1], t[2]) for t in timetrack_list]
+        ]
+        print ("There are", len(filtered_records), "records after filtering.")
+        print ("Adding", len(timetrack_list), "records from browse_data().")
+        k = len(filtered_records) + 1
+        # make continuous row numbering
+        for t in timetrack_list:
+            t[0] = f"{k:>5}:"  # update row number
+            k = k + 1
+        return filtered_records
+
+
+    FILENAME_TIMETRACK = "tw_data.json"
+    # option to execute online browsing for tw data
+    OPT_UPDATE_DATABASE = False
+
+    tw_data = read_timetrack_json(FILENAME_TIMETRACK)
+
+    # Extract records from JSON structure
+    records = tw_data.get("records", [])
+
+    analyze_timtrack_records(records)
 
     ### test
     #print (records[0])
 
     db_updated = 0
-    if 1:
+    timetrack_list = []
+    if OPT_UPDATE_DATABASE:
         # TODO use the latest day to set the date in browse from which start browsing
+        # TODO confine date not to cross 1st of the month 
+        #   because dialog appears in tisoware 
+        #   and more importantly no submit button will be available
+        # use selenium to obtain the timekeeping data
+        # TODO shall run in background thread ultimately
         timetrack_list = browse_data()
+
         db_updated = 1
+
+        (earliest, latest) = analyze_timtrack_records(timetrack_list)
+
+        # leave only old records
+        records = filter_old_records(timetrack_list, records)
+
     else:
         print("skip browse_data()")
-        timetrack_list = records
 
-    ### test
-    #print (timetrack_list[0])
-    (earliest, latest) = analyze_timtrack_records(timetrack_list)
-
-    # At this point 
-    # - the list of "records" contains outdated information
-    # - the list of "timetrack_list" contains new information from tisoware
-    # Proceedure:
-    # - go through the list "records" and remove all records
-    #   which have exactly same date (column "Date") and time (column "Start Time")
-    #   as the records in the "timetrack_list"
-    # 
-    # Filter directly within the list comprehension
-    filtered_records = [
-        r for r in records
-        if (r[1], r[2]) not in [(t[1], t[2]) for t in timetrack_list]
-    ]
-    # forget old list
-    records = filtered_records
-    print ("There are", len(records), "records after filtering.")
-    print ("Adding", len(timetrack_list), "records from browse_data().")
-    k = len(records) + 1
-    for t in timetrack_list:
-        t[0] = f"{k:>5}:"  # update row number
-        k = k + 1
 
     if db_updated:
         # save time tracking data to file
-        print("export data to database", ttdb)
+        print("export data to database", FILENAME_TIMETRACK)
         if not "header" in tw_data:
             # Define header of the file with comments about the record structure
             header_info = {
                 "description": "This file contains time-tracking records imported from tisoware.",
                 "fields": [
                     "Record No (str): Unique identifier for each entry '   NN.'",
-                    "Date (str): The date of work",
+                    "Date (str): The date of work (Do, 22.05.2025)",
                     "Start Time (str): Time when work started",
                     "End Time (str): Time when work ended",
                     "Project Key (str): Identifier for the project",
@@ -545,19 +627,49 @@ if __name__ == "__main__":
         tw_data["records"] = records + timetrack_list
 
         # Save to JSON file
-        with open(ttdb, "w", encoding="utf-8") as json_file:
+        with open(FILENAME_TIMETRACK, "w", encoding="utf-8") as json_file:
             json.dump( tw_data, json_file, indent=2)
 
-        print(f"Timetracking info stored to JSON file '{ttdb}'")
+        print(f"Timetracking info stored to JSON file '{FILENAME_TIMETRACK}'")
     else:
         print(f"skip save database, as db_updated = {db_updated}")
 
 
+    """
+    Procedure:
+    ----------
+    1. Open selenium in GUI mode (no headless) - because need to review input
+    2. Run browse_data():
+       timetrack_list = browse_data()
+       # creates list of timetrack entries, some filled and some empty
+    3. Load tasks.json database using mod_db
+    4. Create tracker = TimeTracking() from mod_timetrack
+       execute tracker.tw_report with option empty_project_only=True
+    5. Iterate through empty entries, fill in project and subproject part
+       and add comment from the timetrack_deviation list
+    """
+    from mod_db import Database
+    db = Database()
+    database = db.load_data()
+    from mod_timetrack import TimeTracking
+    tracker = TimeTracking()
+    earliest_date = tracker.tw_report(
+        database["task_details"],
+        empty_project_only=True
+    )
+    tracker.print_timetrack_deviation()
+
+
+    # resume working in displayed browser
+    # will do nothing and return if browse was not executed
+    update_timetracking( )
+
+
     # Check if the file exists
-    if not os.path.exists(ttdb):
-        print(f"Database '{ttdb}' does not exist.")
+    if not os.path.exists(FILENAME_TIMETRACK):
+        print(f"Database '{FILENAME_TIMETRACK}' does not exist.")
     else:
-        print(f"Database '{ttdb}' found - will show in GUI")
+        print(f"Database '{FILENAME_TIMETRACK}' found - will show in GUI")
 
     if db_updated and 0:
         # Re-read the database
@@ -580,7 +692,7 @@ if __name__ == "__main__":
         # first 4 columns shall be narrow, last 3 information columns wide
 
         # Load JSON data
-        with open(ttdb, "r", encoding="utf-8") as file:
+        with open(FILENAME_TIMETRACK, "r", encoding="utf-8") as file:
             data = json.load(file)
 
         records = data.get("records", [])
