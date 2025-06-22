@@ -32,10 +32,11 @@ class Entry:
 
 driver = None
 
-# connect to the webpage
+# connect to the webpage given by the url
 # select PRZ sheet
-# select and display the span of 2 weeks in the sheet
+# select and display the span of the date from 1.st of this month until today
 # return all inputs relevant for user from that sheet
+#
 # @return list of lists
 # - each list contains values of row elements
 #   row #
@@ -174,13 +175,10 @@ def browse_data(
 
     #time.sleep(3)
 
-    # 2. Select the date range
+    # 2. Select the date range from the 1st of the month
     #
-    # Calculate the date two weeks before today
-    #new_date = (datetime.today() - timedelta(weeks=3)).strftime("%d.%m.%Y")
-    NUM_WEEKS_BACK = 3
-    new_date = get_ts(
-        (datetime.today() - timedelta(weeks=NUM_WEEKS_BACK)),
+    first_of_month_str = get_ts(
+        datetime.today().replace(day=1),
         fmt = FMT_DATE
     )
 
@@ -189,8 +187,8 @@ def browse_data(
     # select content (Ctrl-a), send new date there, Tab to update value
     frdate = E("frD")
     frdate.click()
-    frdate.send_keys(Keys.CONTROL, "a")
-    frdate.send_keys(new_date, Keys.TAB)
+    frdate.send_keys( Keys.CONTROL, "a")
+    frdate.send_keys( first_of_month_str, Keys.TAB)
 
     # Verify the change
     print(f"Updated start date: {frdate.get_attribute('value')}")
@@ -425,10 +423,22 @@ def browse_data(
 
             E("netblbuchaend").click()
 
-def update_timetracking( ):
+def update_timetracking( tracker ):
+    """
+    fill in the timetracking form using the global browser driver,
+    (browse_data() must be called before use - to create the Selenium driver)
+    #
+    # the function loops through the displayed timetracking page
+    # and fills in the missing details
+
+    Args:
+        tracker - the timetracking module used to compare timetracking with ttplus data
+        the deviation list is needed for filling the form from its notes
+    """
     global driver
     if None == driver:
         return
+
     # In the browse_data() - Already SWITCHED to the iframe using its ID !
     # Create a wait object (again) using the browser driver
     wait = WebDriverWait(driver, 10)
@@ -444,32 +454,50 @@ def update_timetracking( ):
     row_count = len(rows)
     print(f"Number of rows: {row_count}")
 
-    # text input fields need to be filled
-    text_inputs = rows[0].find_elements(By.CSS_SELECTOR, "input[type='text']")
-    inpus_count = len(text_inputs)
-    # Print the IDs of all found input fields
-    inf_list = []
-    for inf in text_inputs:
-        #print(inf.get_attribute("id") + ("-" * 15))
-        inf_list.append( inf.get_attribute("id") )
-    print(f"Writing {inpus_count} text inputs: {inf_list}")
-    k=1
+    if 1:
+        # test to display example
+        # text input fields need to be filled
+        text_inputs = rows[0].find_elements(By.CSS_SELECTOR, "input[type='text']")
+        inpus_count = len(text_inputs)
+        # Print the IDs of all found input fields
+        inf_list = []
+        for inf in text_inputs:
+            #print(inf.get_attribute("id") + ("-" * 15))
+            inf_list.append( inf.get_attribute("id") )
+        print(f"Writing {inpus_count} text inputs: {inf_list}")
+
     # iterate through all rows in the Zeiterfassung HTML table
+    row_number = 1
     for row in rows:
-        # find all input elements in selected row and add them to info row
+        # find all input elements - put into a list
         text_inputs = row.find_elements(By.CSS_SELECTOR, "input[type='text']")
         if "" == text_inputs[3].get_attribute("value"):
-            # found empty project field
-            print(f"{k:>5}:")  # row number
+            #for original, closest, diff, note_text in self.timetrack_deviation:
+            #    print(f"{original}  ➝  {closest}  | Difference: {diff:>4} minutes - {note_text}")
+            # found empty project field, get its timestamp
+            date_text = text_inputs[0].get_attribute("value")
+            time_text = text_inputs[1].get_attribute("value")
+            ts_key = date_text.split(", ")[1]  # Remove weekday
+            # string key
+            ts_key = ts_key + time_text
+            # convert to datetime key - did this in tracker!
+            ts_key = get_dt( ts_key, "%d.%m.%Y%H:%M")
+            # timestamp is the combination of date and start time
+            # in its webpage formats ("%d.%m.%Y%H:%M")
+            # tracker already uses that as a key to detail name
+            ts_dbg = date_text + "--" + time_text
+            print(f"{row_number:>5}:{ts_dbg}")
             project_key = "9300_2025_Fs-DCP"
             text_inputs[3].send_keys( project_key )
+            note_text = tracker.ts_note_dict[ts_key]
+            text_inputs[4].send_keys( note_text )
             # after the project was selected,
             # the select control below will be populated
             # find the select element for "type of work" -- 2nd selector
             # select.select_by_index(len(select.options) - 1)
             select_elements = row.find_elements(By.CSS_SELECTOR, "select")
             select_elements[1].send_keys(Keys.END) # select last option
-        k=k+1
+        row_number += 1
 
 
 if __name__ == "__main__":
@@ -559,7 +587,7 @@ if __name__ == "__main__":
 
     FILENAME_TIMETRACK = "tw_data.json"
     # option to execute online browsing for tw data
-    OPT_UPDATE_DATABASE = False
+    OPT_UPDATE_DATABASE = True
 
     tw_data = read_timetrack_json(FILENAME_TIMETRACK)
 
@@ -662,7 +690,7 @@ if __name__ == "__main__":
 
     # resume working in displayed browser
     # will do nothing and return if browse was not executed
-    update_timetracking( )
+    update_timetracking( tracker )
 
 
     # Check if the file exists

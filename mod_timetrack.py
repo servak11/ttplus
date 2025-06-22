@@ -181,17 +181,20 @@ class TimeTracking:
             list1 = [row[2] for row in timetrack_list]
         # 
         list2 = [(row[0], row[2]) for row in td_report_list]
+
         # (row[0], row[2]) tuple saves start time and task detail name
         # Find closest match for each datetime between the lists
         # self.timetrack_deviation is dynamically created class variable ...
         # it is created when tw_report() was called
-        self.timetrack_deviation = []
+        self.timetrack_deviation = []   # create deviation list
+        self.ts_note_dict = {}          # create start time note dictionary
         for dt1 in list1:
             # compare start time (item[0] from list2) with dt1 start time from list 1
             # and return both items from list2
             closest_dt, note_text = min(list2, key=lambda item2: abs(dt1 - item2[0]))
             time_diff_minutes = int((dt1 - closest_dt).total_seconds() / 60)
             self.timetrack_deviation.append((dt1, closest_dt, time_diff_minutes, note_text))
+            self.ts_note_dict[dt1] = note_text
 
         return (dt_earliest)
 
@@ -224,48 +227,24 @@ class TimeTracking:
                             containing at least the key 'Start Time' (formatted as '%Y%m%d%H%M%S').
 
         Returns:
-            datetime or None: The corresponding time-tracking entry's datetime if a match is found,
-                              or None if no matching entry exists or deviation data is unavailable.
+            datetime or None:
+                The corresponding time-tracking entry's datetime if a match is found,
+                or None if no matching entry exists or deviation data is unavailable.
         """
         
-    # the deviation list is composed from entries from the database
-    # this means task detail is either in the list or does not have matching
-    # timetracking task
-    #
-    # in this routine we detect if the task detail has a matching timetracking task
-    #
-    # @param d_entry dict entry from the ttplus database
-    # @return datetime from deviation list corresponding to that entry
-    #         None in error case
-    def check_deviation(self, d_entry):
-        """Checks if the task's 'Start Time' has a deviation."""
         # Ensure timetrack_deviation exists
         if not self.timetrack_deviation:
             return None  # No tracking data available
 
-        # First check if self.timetrack_deviation variable exists
-        # Given:
-        # - list self.timetrack_deviation
-        # - dict d_entry with task details
-        # Find:
-        #   the tuple from self.timetrack_deviation which d_entry["Start Time"]
-        #   is equal to dt1 in the tuple
-        # ....?
-
-        # string to datetime
         db_sts = get_dt(d_entry["Start Time"])
 
         # Find matching tuple for d_entry["Start Time"]
-        for track_ts, db_ds, time_diff_minutes, task_id in self.timetrack_deviation:
+        for track_ts, db_ds, _, _ in self.timetrack_deviation:
             #time_diff_minutes = int((track_ts - db_sts).total_seconds() / 60)
             #print(f"{track_ts}  ➝  {db_ds}  | Difference: {time_diff_minutes:>4} minutes")
             if db_ds == db_sts:
                 return track_ts
-                if time_diff_minutes != 0:
-                    return f"OVERDUE: {db_ds.strftime('%d.%m.%Y %H:%M')} ({time_diff_minutes})"
-                else:
-                    return f"ON TIME: {db_ds.strftime('%d.%m.%Y %H:%M')}"
-        
+
         return None #"No matching entry found"  # Handle cases where no match exists
 
 
