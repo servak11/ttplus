@@ -84,11 +84,15 @@ class DateLabel(tk.Frame):
 
         self.tooltip = ToolTip(self.lock_button, "Lock")  # Attach Tooltip
 
-
+    def reset(self):
+        """ Method to Reset the control needed if we change to a new task detail"""
+        self.spin_var.set(0)
+        # current_state = self.lock_button.cget("relief")
+        self.lock_button.config(relief="raised")
 
     def get_date(self):
-        """ Return the currently displayed date to a string in timestamp format"""
-        return get_ts(self._date)
+        """ Return the currently displayed date as a string in timestamp format FMT_LONG"""
+        return get_ts(self._date) # convert to FMT_LONG
 
     def set_date(self, timestamp: str) -> None:
         """Set the date, given timestamp string.
@@ -133,6 +137,7 @@ class DateLabel(tk.Frame):
         try:
             days_offset = int(self.spin_var.get())
             adjusted_date = self._date + timedelta(days=days_offset)
+            # display date in the GUI control using FMT_DATE
             self.date_label.config(
                 text=get_ts(adjusted_date, fmt=FMT_DATE)
             )

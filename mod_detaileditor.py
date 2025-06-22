@@ -50,15 +50,16 @@ class TaskDetailEditor(tk.LabelFrame):
         self.note_loaded = False
 
         # Bind events for all controls
+        # Note. (add="+") is used to prevent overwrite of TimeSpinControl validation
         self.task_detail.bind("<KeyRelease>", self._on_change)
         self.notes.bind("<KeyRelease>", self._on_change)
-        self.start_hour.bind("<KeyRelease>", self._on_change)
+        self.start_hour.bind("<KeyRelease>", self._on_change, add="+")
         self.start_hour.bind("<ButtonRelease-1>", self._on_change)
-        self.start_minute.bind("<KeyRelease>", self._on_change)
+        self.start_minute.bind("<KeyRelease>", self._on_change, add="+")
         self.start_minute.bind("<ButtonRelease-1>", self._on_change)
-        self.end_hour.bind("<KeyRelease>", self._on_change)
+        self.end_hour.bind("<KeyRelease>", self._on_change, add="+")
         self.end_hour.bind("<ButtonRelease-1>", self._on_change)
-        self.end_minute.bind("<KeyRelease>", self._on_change)
+        self.end_minute.bind("<KeyRelease>", self._on_change, add="+")
         self.end_minute.bind("<ButtonRelease-1>", self._on_change)
 
     def _create_note_detail_head(self):
@@ -270,6 +271,8 @@ class TaskDetailEditor(tk.LabelFrame):
         """
         if dict_data:
             self.d1 = dict_data
+            # reset offset to 0
+            self.date_control.reset()
             # Enable editing of selected note
             self.first_line.pack(fill="x", padx=5, pady=5)  # Repack the frame (unhide)
             self._enable_widgets(self.first_line)
@@ -389,8 +392,7 @@ class TaskDetailEditor(tk.LabelFrame):
         d = self.timestamp[:8]  # YYYYMMDD
         h = self.start_hour.get()
         m = self.start_minute.get()
-        #print(f"get_start_time return {d}{h}{m}00")
-        return f"{d}{h}{m}00"
+        return f"{d}{int(h):02}{int(m):02}00"
 
     def set_start_time(self, timestamp):
         self.timestamp = timestamp # remember for return path
@@ -407,7 +409,7 @@ class TaskDetailEditor(tk.LabelFrame):
         d = self.timestamp[:8]  # YYYYMMDD
         h = self.end_hour.get()
         m = self.end_minute.get()
-        return f"{d}{h}{m}00"
+        return f"{d}{int(h):02}{int(m):02}00"
 
     def set_end_time(self, timestamp):
         """ Extract hour and minute from the timestamp """
