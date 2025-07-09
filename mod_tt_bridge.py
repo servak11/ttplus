@@ -690,7 +690,7 @@ if __name__ == "__main__":
 
     # resume working in displayed browser
     # will do nothing and return if browse was not executed
-    update_timetracking( tracker )
+    #update_timetracking( tracker )
 
 
     # Check if the file exists

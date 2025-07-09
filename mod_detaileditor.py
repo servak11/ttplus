@@ -439,6 +439,8 @@ class TaskDetailEditor(tk.LabelFrame):
         The timer is stopped when the task is changed.
         """
         self.set_end_time( get_ts() )
+        # TODO timer does change the widget, but does not change the task details!
+        self.end_minute.event_generate("<KeyRelease>", keysym="Escape")
 
         # Schedule the next update after 60 seconds
         if self.count_time:
