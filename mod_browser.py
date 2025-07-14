@@ -33,16 +33,9 @@ URL = 'http://menlogphost5.menlosystems.local/tisoware/twwebclient'
 #   because added from selector element in the end
 class MyBrowser:
     def __init__(self, url = None ):
-        if 0:
-            # Set up Edge options for headless mode (no visible window)
-            edge_options = Options()
-            edge_options.add_argument("--headless")
-            # Improve performance
-            edge_options.add_argument("--disable-gpu")  
-            driver = webdriver.Edge(options=edge_options)
-
-        #from selenium import webdriver
         edge_options = webdriver.EdgeOptions()
+
+        # Set up Edge options for headless mode (no visible window)
         #edge_options.add_argument("--headless")
 
         # Improve performance
@@ -50,7 +43,7 @@ class MyBrowser:
         edge_options.add_argument("--disable-features=EdgeIdentity")
 
         self.driver = webdriver.Edge(options=edge_options)
-        self.driver = webdriver.Edge()
+        #self.driver = webdriver.Edge()
 
         if url is None:
             url = URL
@@ -77,13 +70,7 @@ class MyBrowser:
             """
             ))
 
-    def browse_data(
-            #date: str,
-            #data: List[Entry],
-            #driver=None,
-            url=None
-        ):
-        pass
+
 
 class Tiso(MyBrowser):
     def __init__(self, url = None ):
@@ -143,7 +130,7 @@ class Tiso(MyBrowser):
         """
         print()
 
-    def select_ze(self):
+    def read_timetrack_list(self):
         d = self.driver
         """
         # 1. Select Zeiterfassungs Mappe - timetracking sheet
@@ -162,6 +149,19 @@ class Tiso(MyBrowser):
         1.st of month because that app does not allow
         to edit content of previous month, all records must be done
         within the current one
+
+        # 3. Return all inputs relevant for user from that sheet
+
+        Return: list of lists
+        - each list contains values of row elements
+          row #
+          WeekDay, Date DD.MM.YYYY
+          TT:MM start
+          TT:MM end
+          project
+          comment
+          project item - note last item in the list,
+          because added from selector element in the end
         """
         first_of_month_str = get_ts(
             datetime.today().replace(day=1),
@@ -188,7 +188,8 @@ class Tiso(MyBrowser):
         time.sleep(1)
 
         """
-        # 3. The timetracking sheet would now be loaded into an IFRAME !
+        # IFRAME tblfldfr:
+        #   The timetracking sheet would now be loaded into an IFRAME !!!
         #
         # Hierarchy
         # mainWinTable
@@ -200,8 +201,11 @@ class Tiso(MyBrowser):
         # ----- .. table
         # ----- .. td(iframe nmfrfrrest) td(id tren_tbl) td (iframe tblfldfr)
         # This is timetracking iframe
-        # <iframe frameborder="0" id="tblfldfr" style="width: 692.478px; height: 485.115px; overflow: hidden; border: none;" src="../tisowareClient/0b6436d9657672fa53b2c26e73b0cd3e19c1f4ad86f7c7132fed37b0f151184d/inff1079215197.html" name="tblfldfr" scrolling="no" class="inbindresize"></iframe>
-        #  tblfldfr
+        # <iframe frameborder="0" id="tblfldfr" name="tblfldfr"
+        #   style="width: 692.478px; height: 485.115px; overflow: hidden; border: none;"
+        #   src="../tisowareClient/0b6436d9657672fa53b2c26e73b0cd3e19c1f4ad86f7c7132fed37b0f151184d/inff1079215197.html"
+        #   scrolling="no" class="inbindresize">
+        # </iframe>
         #
         # Need to SWITCH to the iframe using its ID !
         """
@@ -211,6 +215,7 @@ class Tiso(MyBrowser):
         # Wait for the erfassung table to appear:
         table = self.wait.until(EC.presence_of_element_located((By.ID, "dvTblFLmain")))
 
+        print("---------- select Zeiterfassung")
         print("Table found:", table.id)
         # Find all rows inside the table
         rows = table.find_elements(By.TAG_NAME, "tr")
@@ -245,6 +250,93 @@ class Tiso(MyBrowser):
             row_list.append(inf_list)
 
         return row_list
+
+    def update_timetracking( self, tracker ):
+        """
+        Fill in the timetracking form.
+
+        Note. In the browser - shoud have ALREADY SWITCHED to the IFRAME using its ID !
+
+        This function loops through the displayed timetracking page
+        and fills in the table with the form with the missing details.
+
+        Args:
+            tracker
+                - the timetracking module used to compare the Tise timetracking
+                  with the ttplus data
+                - the deviation list is needed
+                  for filling the form from its notes
+        """
+        #d = self.driver
+        #if None == d:
+        #    return
+
+        # Wait for the erfassung table to appear:
+        # only self.wait represents here the connection to the webpage
+        # then we receive the table element with its children
+        table = self.wait.until(
+            EC.presence_of_element_located(
+                (By.ID, "dvTblFLmain")
+            )
+        )
+
+        print("---------- update_timetracking")
+        print("Table found:", table.id)
+        # Find all rows inside the table
+        rows = table.find_elements( By.TAG_NAME, "tr")
+        # Get the row count
+        row_count = len(rows)
+        print(f"Number of rows: {row_count}")
+
+        if 1:
+            # test to display example
+            # text input fields need to be filled
+            text_inputs = rows[0].find_elements(By.CSS_SELECTOR, "input[type='text']")
+            inpus_count = len(text_inputs)
+            # Print the IDs of all found input fields
+            inf_list = []
+            for inf in text_inputs:
+                #print(inf.get_attribute("id") + ("-" * 15))
+                inf_list.append( inf.get_attribute("id") )
+            print(f"Writing {inpus_count} text inputs: {inf_list}")
+
+        # iterate through all rows in the Zeiterfassung HTML table
+        row_number = 1
+        for row in rows:
+            # find all input elements - put into a list
+            text_inputs = row.find_elements(By.CSS_SELECTOR, "input[type='text']")
+            if "" == text_inputs[3].get_attribute("value"):
+                #for original, closest, diff, note_text in self.timetrack_deviation:
+                #    print(f"{original}  ➝  {closest}  | Difference: {diff:>4} minutes - {note_text}")
+                # found empty project field, get its timestamp
+                date_text = text_inputs[0].get_attribute("value")
+                time_text = text_inputs[1].get_attribute("value")
+                ts_key = date_text.split(", ")[1]  # Remove weekday
+                # string key
+                ts_key = ts_key + time_text
+                # convert to datetime key - did this in tracker!
+                ts_key = get_dt( ts_key, "%d.%m.%Y%H:%M")
+                # timestamp is the combination of date and start time
+                # in its webpage formats ("%d.%m.%Y%H:%M")
+                # tracker already uses that as a key to detail name
+                ts_dbg = date_text + "--" + time_text
+                print(f"{row_number:>5}:{ts_dbg}")
+                project_key = "9300_2025_Fs-DCP"
+                text_inputs[3].send_keys( project_key )
+                try:
+                    note_text = tracker.ts_note_dict[ts_key]
+                    text_inputs[4].send_keys( note_text )
+                except KeyError as ke:
+                    print("Error: cannot get note for ", ts_key)
+                # after the project was selected,
+                # the select control below will be populated
+                # find the select element for "type of work" -- 2nd selector
+                # select.select_by_index(len(select.options) - 1)
+                select_elements = row.find_elements(By.CSS_SELECTOR, "select")
+                select_elements[1].send_keys(Keys.END) # select last option
+            row_number += 1
+
+
 
 if __name__ == "__main__":
 
@@ -289,7 +381,7 @@ if __name__ == "__main__":
 
     t=Tiso()
     t.open_trans("Erfassungsmappen")
-    row_list = t.select_ze()
+    row_list = t.read_timetrack_list()
     #
     # works 09.07.2025
     #

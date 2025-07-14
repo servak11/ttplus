@@ -589,6 +589,8 @@ if __name__ == "__main__":
     # option to execute online browsing for tw data
     OPT_UPDATE_DATABASE = True
 
+    # Read accumulated timetracking data
+    # (all records from tiso are stored in this database)
     tw_data = read_timetrack_json(FILENAME_TIMETRACK)
 
     # Extract records from JSON structure
@@ -731,7 +733,19 @@ if __name__ == "__main__":
     # Create the Tkinter window
     root = tk.Tk()
     root.title("Timetracking Records")
-    root.geometry("1200x600")  # Set window size to 800x600 pixels
+    #root.geometry("1200x600")  # Set window size to 800x600 pixels
+    # please root window at ("Right Half of Screen")
+
+    # Get screen dimensions
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+
+    # Set width to half, height to full
+    window_width = screen_width // 2
+    window_height = screen_height
+
+    # Position at right half (x = screen_width // 2)
+    root.geometry(f"{window_width}x{window_height}+{screen_width // 2}+0")
 
     # Create a Treeview widget for the table
     #column_names = ("Record No", "Date", "Start Time", "End Time", "Project Key", "Comment", "Project Item")
