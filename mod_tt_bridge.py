@@ -681,10 +681,15 @@ if __name__ == "__main__":
     from mod_db import Database
     db = Database()
     database = db.load_data()
+
+    tracker_db = Database("tw_data.json")
+    tracker_database = tracker_db.load_data()
+
     from mod_timetrack import TimeTracking
     tracker = TimeTracking()
     earliest_date = tracker.tw_report(
         database["task_details"],
+        tracker_database["records"],
         empty_project_only=True
     )
     tracker.print_timetrack_deviation()

@@ -30,6 +30,8 @@ from controls.datelabel import DateLabel
 import webbrowser
 import re
 
+from config import settings
+
 class TaskDetailEditor(tk.LabelFrame):
     def __init__(self, master, **kwargs):
         # Create the LabelFrame
@@ -168,24 +170,37 @@ class TaskDetailEditor(tk.LabelFrame):
             pass
         return "break"
 
-    # callback installed by  _detect_and_tag_links(self)
-    # to open a link detected in the note detail
-    def _open_link(self,event):
-        tag_range = self.notes.tag_ranges("hyperlink")
-        if tag_range:
-            url = self.notes.get(tag_range[0], tag_range[1])
-            webbrowser.open(url)
+    def _open_link(self, event):
+        """
+        callback installed by  _detect_and_tag_links(self)
+        to open a link detected in the note detail
 
-    # the text of the detail does not change when links are detected and tagged
-    # in a Tkinter Text widget. The actual string content remains untouched
-    # — the only modification is the visual formatting applied through tags
-    def _detect_and_tag_links(self):
-        content = self.notes.get("1.0", tk.END)
+        see self._detect_and_tag_links()
+        """
+        # Get the index of the click position
+        click_index = self.notes.index(f"@{event.x},{event.y}")
+
+        # Get all tagged ranges for "hyperlink"
+        for start, end in zip(*[iter(self.notes.tag_ranges("hyperlink"))]*2):
+            if self.notes.compare(start, "<=", click_index) and self.notes.compare(click_index, "<", end):
+                url = self.notes.get(start, end)
+                #print(f"open hyperlink for ({start}, {end}) -> {url}")
+                webbrowser.open(url)
+                break
+
+    def _tag_hyperlink_references(self, content):
+        """
+        find http(s) hyperlinks and tag them for clicking
+        """
         #matches = re.finditer(r'https?://\S+', content)
-        matches = re.finditer(r'https?://[^\s,;]+[.][a-zA-Z]{2,}', content)
+        # TODO below re does not find path url
+        # https://menlolnx2server.menlo-intern.com/redmine/issues/12423
+        #matches = re.finditer(r'https?://[^\s,;]+[.][a-zA-Z]{2,}', content)
+        # extending:
+        hyperlink_matches = re.finditer(r'https?://[^\s,;()<>"]+', content)
         count_links = 0
         tg="none"
-        for match in matches:
+        for match in hyperlink_matches:
             count_links = count_links + 1
             # get absolute position in the entire text
             start_pos = match.start() 
@@ -196,10 +211,52 @@ class TaskDetailEditor(tk.LabelFrame):
             tag_end = self.notes.index(f"1.0+{end_pos} chars")
 
             tg="hyperlink"
+            #print(f"create {tg} for ({tag_start}, {tag_end}) -> {match}")
             self.notes.tag_add(tg, tag_start, tag_end)
             self.notes.tag_configure(tg, foreground="blue", underline=True)
             self.notes.tag_bind(tg, "<Button-1>", self._open_link)
         #print(f"Converted to {tg}: {count_links} links")
+
+    def _tag_issue_references(self, content):
+        """
+        find #12345 entries and tag them to reuse as hyperlinks
+        """
+        ticket_matches = re.finditer(r'#(\d{4,6})', content)
+        for match in ticket_matches:
+            ticket_number = match.group(1)
+            start_pos = match.start()
+            end_pos = match.end()
+
+            tag_start = self.notes.index(f"1.0+{start_pos} chars")
+            tag_end = self.notes.index(f"1.0+{end_pos} chars")
+
+            tag_name = f"ticket_{ticket_number}"
+            #print(f"create {tag_name} for ({tag_start}, {tag_end}) -> {match}")
+            self.notes.tag_add(tag_name, tag_start, tag_end)
+            self.notes.tag_configure(tag_name, foreground="blue", underline=True)
+
+            # Bind a closure with ticket-specific URL
+            def handler(event, ticket_number=ticket_number):
+                """
+                Args:
+                    ticket_number: str
+                """
+                issue_url = settings["issue_url"]
+                if not issue_url.endswith('/'):
+                    issue_url += '/'
+                issue_url += ticket_number
+                webbrowser.open(issue_url)
+
+            self.notes.tag_bind(tag_name, "<Button-1>", handler)
+
+
+    # the text of the detail does not change when links are detected and tagged
+    # in a Tkinter Text widget. The actual string content remains untouched
+    # — the only modification is the visual formatting applied through tags
+    def _detect_and_tag_links(self):
+        content = self.notes.get("1.0", tk.END)
+        self._tag_hyperlink_references(content)
+        self._tag_issue_references(content)
 
     def set_callback(self, update_task_details_method):
         self.callback = update_task_details_method

@@ -1,3 +1,4 @@
+import selenium
 from selenium import webdriver
 from selenium.webdriver.common.by       import By
 from selenium.webdriver.common.keys     import Keys
@@ -32,6 +33,9 @@ URL = 'http://menlogphost5.menlosystems.local/tisoware/twwebclient'
 #   project item - note last item in the list,
 #   because added from selector element in the end
 class MyBrowser:
+    """
+    wrapper of the Edge, container for the selenium driver
+    """
     def __init__(self, url = None ):
         edge_options = webdriver.EdgeOptions()
 
@@ -41,9 +45,10 @@ class MyBrowser:
         # Improve performance
         edge_options.add_argument("--disable-gpu")  
         edge_options.add_argument("--disable-features=EdgeIdentity")
+        edge_options.add_argument("--disable-sync")
+        edge_options.add_argument("--log-level=3")
 
         self.driver = webdriver.Edge(options=edge_options)
-        #self.driver = webdriver.Edge()
 
         if url is None:
             url = URL
@@ -52,6 +57,12 @@ class MyBrowser:
         self.wait = WebDriverWait(self.driver, 10)
 
         self.driver.get(url)
+
+    def get_driver(self):
+        return self.driver
+
+    def get_byid(self, id):
+        return self.driver.find_element(By.ID, id)
 
     def get_buttons(self):
         return self.driver.find_elements(By.TAG_NAME, "button")
@@ -73,10 +84,19 @@ class MyBrowser:
 
 
 class Tiso(MyBrowser):
+    """
+    extension of the selenium driver container to the tisoware application browser
+
+    inherits self.driver
+    """
     def __init__(self, url = None ):
+        """
+        automate login into timetracking system
+        """
         super().__init__(URL)
         self.menujson = None
         self.login()
+
     def trans_name_from_text(self, text: str):
         """
         return name of the menu of that app
@@ -84,14 +104,23 @@ class Tiso(MyBrowser):
         for e in self.menujson:
             if e["Text"] == text:
                 return e["TransName"]
+
     def open_trans(self, text: str):
         """
         open the page corresponding to the menu of the menu in that app
         """
-        name = self.trans_name_from_text(text)
-        self.driver.execute_script(f'spglNdNew("{name}")')
-        self.wait_for_loaded()
+        try:
+            name = self.trans_name_from_text(text)
+            self.driver.execute_script(f'spglNdNew("{name}")')
+            self.wait_for_loaded()
+            return 1
+        except selenium.common.exceptions.JavascriptException:
+            return 0
+
     def login(self):
+        """
+        decode the password and login into timetracking system
+        """
         from config import u_r, p_d
         # Find the username and password fields and enter credentials
         self.E("Uname").send_keys(u_r[:len(u_r)-3])
@@ -130,7 +159,13 @@ class Tiso(MyBrowser):
         """
         print()
 
+
     def read_timetrack_list(self):
+        """
+        Tiso browser function which opens the PRZ
+        and reads the list of timetracking records
+
+        """
         d = self.driver
         """
         # 1. Select Zeiterfassungs Mappe - timetracking sheet
@@ -215,8 +250,8 @@ class Tiso(MyBrowser):
         # Wait for the erfassung table to appear:
         table = self.wait.until(EC.presence_of_element_located((By.ID, "dvTblFLmain")))
 
-        print("---------- select Zeiterfassung")
-        print("Table found:", table.id)
+        print("---------- read_timetrack_list(): select Zeiterfassung")
+        #print("dvTblFLmain Table found:", table.id)
         # Find all rows inside the table
         rows = table.find_elements(By.TAG_NAME, "tr")
         # Get the row count
@@ -225,11 +260,12 @@ class Tiso(MyBrowser):
         text_inputs = rows[0].find_elements(By.CSS_SELECTOR, "input[type='text']")
         inpus_count = len(text_inputs)
         # Print the IDs of all found input fields
-        inf_list = []
-        for inf in text_inputs:
-            #print(inf.get_attribute("id") + ("-" * 15))
-            inf_list.append( inf.get_attribute("id") )
-        print(f"Reading {inpus_count} text inputs: {inf_list}")
+        #inf_list = []
+        #for inf in text_inputs:
+        #    #print(inf.get_attribute("id") + ("-" * 15))
+        #    inf_list.append( inf.get_attribute("id") )
+        #print(f"Reading {inpus_count} text inputs: {inf_list}")
+        ### compose the read_timetrack_list
         k=1
         row_list = []
         for row in rows:
@@ -237,19 +273,18 @@ class Tiso(MyBrowser):
             text_inputs = row.find_elements(By.CSS_SELECTOR, "input[type='text']")
             inf_list = []
             inf_list = [f"{k:>5}:"]  # row number
+            k=k+1
             for inf in text_inputs:  # get all values
                 inf_list.append(inf.get_attribute("value"))
             #print("  ".join(inf_list))
-            k=k+1
             # find the select element for "type of work" -- 2nd selector
             select_elements = row.find_elements(By.CSS_SELECTOR, "select")
-            #print(select_elements[1].get_attribute("id"))
             selected_option = Select(select_elements[1]).first_selected_option
-            #print(selected_option.text)
             inf_list.append(selected_option.text) # add option to the list
             row_list.append(inf_list)
 
         return row_list
+
 
     def update_timetracking( self, tracker ):
         """
@@ -262,10 +297,11 @@ class Tiso(MyBrowser):
 
         Args:
             tracker
-                - the timetracking module used to compare the Tise timetracking
-                  with the ttplus data
-                - the deviation list is needed
-                  for filling the form from its notes
+                - the timetracking module used to compare
+                  the Tiso timetracking against the ttplus data
+                - tracker.tw_report the deviation list of the tracker
+                  created in the timetracking.tw_report()
+                  is needed for filling the form from its notes
         """
         #d = self.driver
         #if None == d:
@@ -281,31 +317,25 @@ class Tiso(MyBrowser):
         )
 
         print("---------- update_timetracking")
-        print("Table found:", table.id)
+        #print("dvTblFLmain Table found:", table.id)
         # Find all rows inside the table
         rows = table.find_elements( By.TAG_NAME, "tr")
         # Get the row count
         row_count = len(rows)
-        print(f"Number of rows: {row_count}")
+        print(f"Zeiterfassung HTML loaded. Number of rows: {row_count}")
 
-        if 1:
-            # test to display example
-            # text input fields need to be filled
-            text_inputs = rows[0].find_elements(By.CSS_SELECTOR, "input[type='text']")
-            inpus_count = len(text_inputs)
-            # Print the IDs of all found input fields
-            inf_list = []
-            for inf in text_inputs:
-                #print(inf.get_attribute("id") + ("-" * 15))
-                inf_list.append( inf.get_attribute("id") )
-            print(f"Writing {inpus_count} text inputs: {inf_list}")
+        # always book to this project
+        project_key = "9300_2025_Fs-DCP"
 
         # iterate through all rows in the Zeiterfassung HTML table
         row_number = 1
         for row in rows:
             # find all input elements - put into a list
             text_inputs = row.find_elements(By.CSS_SELECTOR, "input[type='text']")
-            if "" == text_inputs[3].get_attribute("value"):
+            project_text = text_inputs[3].get_attribute("value")
+            #comment_text = text_inputs[4].get_attribute("value") # must be empty
+            #if "" == comment_text:
+            if "" == project_text:
                 #for original, closest, diff, note_text in self.timetrack_deviation:
                 #    print(f"{original}  ➝  {closest}  | Difference: {diff:>4} minutes - {note_text}")
                 # found empty project field, get its timestamp
@@ -319,10 +349,11 @@ class Tiso(MyBrowser):
                 # timestamp is the combination of date and start time
                 # in its webpage formats ("%d.%m.%Y%H:%M")
                 # tracker already uses that as a key to detail name
-                ts_dbg = date_text + "--" + time_text
-                print(f"{row_number:>5}:{ts_dbg}")
-                project_key = "9300_2025_Fs-DCP"
-                text_inputs[3].send_keys( project_key )
+                if 1: # debug timestamp
+                    ts_dbg = date_text + "--" + time_text
+                    print(f"  -- row {row_number:>4}:{ts_dbg}")
+                if "" == project_text:
+                    text_inputs[3].send_keys( project_key )
                 try:
                     note_text = tracker.ts_note_dict[ts_key]
                     text_inputs[4].send_keys( note_text )
