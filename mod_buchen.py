@@ -13,10 +13,33 @@ from util.ts import *
 import tkinter as tk
 from tkinter import ttk
 
+# starter control
+import threading
+import mod_socket
+
+
+
 URL = 'http://menlogphost5.menlosystems.local/tisoware/twwebclient'
 
 
 t=None
+
+
+"""
+This is the Zeiterfassung menu as of 28.01.2026
+
+<ul class="mm-listview">
+<li class="mm-listitem">
+    <a class="conmenu mm-listitem__text" title="Buchung / Web-Terminal ( PWB )"
+       href="#"
+       onmousedown="{setValue(&quot;tekeine&quot;,&quot;TimingProtocol&quot;);}"
+       onclick="{setValueInForm(&quot;IsReact&quot;,&quot;False&quot;);setValueInForm(&quot;TransID&quot;,&quot;385&quot;); spglNdNew(&quot;TimingProtocol&quot;);;}"
+       oncontextmenu="{menuContextMenuShow(&quot;id_menu_con&quot;, event); return false;;}">
+            <i class=" fa-light fa-fw fa-sign-in" title="Buchung / Web-Terminal ( PWB )"></i>Buchung / Web-Terminal</a></li>
+<li class="mm-listitem"><a class="conmenu mm-listitem__text" title="Erfassungsmappen ( PEM )" href="#" onmousedown="{setValue(&quot;tekeine&quot;,&quot;WorkSheetPortfolio&quot;);}" onclick="{setValueInForm(&quot;IsReact&quot;,&quot;False&quot;);setValueInForm(&quot;TransID&quot;,&quot;151&quot;); spglNdNew(&quot;WorkSheetPortfolio&quot;);;}" oncontextmenu="{menuContextMenuShow(&quot;id_menu_con&quot;, event); return false;;}"><i class=" fa-light fa-fw fa-folder" title="Erfassungsmappen ( PEM )"></i>Erfassungsmappen</a></li>
+<li class="mm-listitem"><a class="conmenu mm-listitem__text" title="Jahreskalender ( PAE )" href="#" onmousedown="{setValue(&quot;tekeine&quot;,&quot;Calendar&quot;);}" onclick="{setValueInForm(&quot;IsReact&quot;,&quot;False&quot;);setValueInForm(&quot;TransID&quot;,&quot;54&quot;); spglNdNew(&quot;Calendar&quot;);;}" oncontextmenu="{menuContextMenuShow(&quot;id_menu_con&quot;, event); return false;;}"><i class=" fa-light fa-fw" data-icon="N" title="Jahreskalender ( PAE )">  </i>Jahreskalender</a></li>
+<li class="mm-listitem"><a class="conmenu mm-listitem__text" title="Monatsübersicht ( PST )" href="#" onmousedown="{setValue(&quot;tekeine&quot;,&quot;TimeSheet&quot;);}" onclick="{setValueInForm(&quot;IsReact&quot;,&quot;False&quot;);setValueInForm(&quot;TransID&quot;,&quot;35&quot;); spglNdNew(&quot;TimeSheet&quot;);;}" oncontextmenu="{menuContextMenuShow(&quot;id_menu_con&quot;, event); return false;;}"><i class=" fa-light fa-fw" data-icon="v" title="Monatsübersicht ( PST )">  </i>Monatsübersicht</a></li></ul>
+"""
 
 
 # test script to check sanity of the data in the list 
@@ -61,10 +84,80 @@ def add_treeview( root, records ):
 
 def t_login():
     global t
-    t=Tiso()
+    if t and t.is_alive():
+        t.login()
+    else:
+        t = Tiso()
+
+def t_urlaub():
+    """
+    open Abwesenheitserfassung page
+    """
+    menu_text = "Abwesenheitserfassung" # old version
+    #menu_text = "Urlaub" # after 28.01.2026 - this is the request for Urlaub
+    menu_text = "Jahreskalender" # after 28.01.2026
+
+    global t
+
+    if(None==t):
+        print ("Login first!")
+    else:
+        try:
+            if not t.open_trans(menu_text):
+                print ("Sorry cannot open that (normal way) from:")
+                print(t.get_driver().current_url)
+                return
+        except Exception as e:
+            print ("Sorry cannot open that (exception) - window was closed")
+            return
+
+def t_home():
+    """
+    open tisoware user home page
+    """
+    global t
+
+    if(None==t):
+        print ("Login first!")
+    else:
+        try:
+            if not t.open_trans("Home"):
+                print ("Sorry cannot open that (normal way) from:")
+                print(t.get_driver().current_url)
+                return
+        except Exception as e:
+            print ("Sorry cannot open that (exception) - window was closed")
+            return
+
+
+def t_sk():
+    """
+    open Stempelkarte page
+    """
+    menu_text = "Stempelkarte" # old version
+    menu_text = "Monatsübersicht" # after 28.01.2026
+
+    global t
+
+    if(None==t):
+        print ("Login first!")
+    else:
+        try:
+            if not t.open_trans(menu_text):
+                print ("Sorry cannot open that (normal way) from:")
+                print(t.get_driver().current_url)
+                return
+        except Exception as e:
+            print ("Sorry cannot open that (exception) - window was closed")
+            return
+
 
 def t_book_time():
+    print(">>> t_book_time() called")
     """
+    Original behaviour:
+    ===================
+
     booking page consists of 3 tabs "reiters"
     - buchung 
     - gbuchung
@@ -76,19 +169,21 @@ def t_book_time():
     active reiter has class "active" to the list
     """
     global t
+
+    menu_text = "Buchung" # old version
+    menu_text = "Buchung / Web-Terminal" # after 28.01.2026
+
     # http://menlogphost5.menlosystems.local/tisoware/twwebclient#gbuchung
-    if(None==t):
+    if(None==t)or(not t.is_already_logged_in()):
         print ("Login first!")
     else:
         try:
-            if not t.open_trans("Buchung"):
+            if not t.open_trans(menu_text):
                 print ("Sorry cannot open that (normal way) from:")
                 print(t.get_driver().current_url)
                 return
         except Exception as e:
-            print ("Sorry cannot open that (except way) from:")
-            print(t.get_driver().current_url)
-            print(e)
+            print ("Sorry cannot open that (exception) - window was closed")
             return
 
         d = t.get_driver()
@@ -107,17 +202,25 @@ def t_book_time():
         #d.execute_script("arguments[0].classList.remove('active');", div)
         # 
         # activete getatigte buchungen
-        div = t.get_byid("li_abfrage")
-        div.click()
-        div = t.get_byid("li_gbuchung")
-        div.click()
-        #table = t.E("tblabfrage")
-        ##d.execute_script("document.getElementById('tblabfrage').style.display = 'block';")
-        js_code = ""
-        # run JavaScript read from file to append summary table at the end
-        with open('tblabfrage.js', 'r') as file:
-            js_code = file.read()
-        d.execute_script(js_code)
+        #div = t.get_byid("li_abfrage")
+        div = t.EW("li_abfrage")
+        if div:
+            div.click()
+        #div = t.get_byid("li_gbuchung")
+        div = t.EW("li_gbuchung")
+        if div:
+            # buchung tab opened success
+            div.click()
+            #table = t.E("tblabfrage")
+            ##d.execute_script("document.getElementById('tblabfrage').style.display = 'block';")
+            js_code = ""
+            # read JavaScript from file
+            # - this script would append summary table
+            #   at the end of the buchung table
+            #   (the summary table is otherwise in a different tab which is nonsense)
+            with open('tblabfrage.js', 'r') as file:
+                js_code = file.read()
+            d.execute_script(js_code)
 
 
 def t_log_time():
@@ -127,6 +230,8 @@ def t_log_time():
     and therefore the times are stored in the tool
 
     1. read_timetrack_list() from the tool in the browser
+       - analyse the table displayed in the Tiso booking page
+         and create list of records with time information
 
     2. Prepare to Display the log records in GUI (filter_old_records)
        - the older records ware loaded into d_tw_data_records (black color)
@@ -142,13 +247,13 @@ def t_log_time():
     # records read from tw_data.json
     global d_tw_data_records
     if(None==t):
-        print ("Login firts!")
+        print ("Login first!")
     else:
         t.open_trans("Erfassungsmappen")
         # read records from online database
         timetrack_list = t.read_timetrack_list()
         print(f"timetrack_list:")
-        debug_flag = 0
+        debug_flag = 1
         if debug_flag:
             for row in timetrack_list:
                 print("  -- " + str(row))
@@ -171,8 +276,9 @@ def t_log_time():
             timetrack_list,
             empty_project_only=True
         )
+        print("*** report_tracker.print_timetrack_deviation()")
         report_tracker.print_timetrack_deviation()
-        print("Done TW report.")
+        print("*** Done TW report.")
 
 
         # leave only "old" records just for display
@@ -186,7 +292,7 @@ def t_log_time():
         tw_data["header"]["date range"] = f"{earliest} - {latest}"
         # combine the lists
 
-
+        # store the combined list in the database (json file)
         tw_data["records"] = d_tw_data_records + timetrack_list
         FILENAME_TIMETRACK = "tw_data.json"
         write_timetrack_json( FILENAME_TIMETRACK, tw_data)
@@ -219,6 +325,7 @@ def t_log_time():
         # 4. write to row
         # 5. write to tw_data (update)
 
+
 def add_toolbar( root ):
 
     # Toolbar frame
@@ -227,12 +334,20 @@ def add_toolbar( root ):
 
     # Add buttons to the toolbar
     btn_login   = tk.Button(toolbar, text="Login" , command=t_login)
+    b2  = tk.Button(toolbar, text="Home", command=t_home)
+    b2.pack(side="left", padx=2, pady=2)
     btn_book    = tk.Button(toolbar, text="Book"  , command=t_book_time)
     btn_report  = tk.Button(toolbar, text="Report", command=t_log_time)
 
     btn_login.pack(side="left", padx=2, pady=2)
     btn_book.pack(side="left", padx=2, pady=2)
     btn_report.pack(side="left", padx=2, pady=2)
+
+    b2  = tk.Button(toolbar, text="See Urlaub", command=t_urlaub)
+    b2.pack(side="left", padx=2, pady=2)
+
+    b2  = tk.Button(toolbar, text="Stempelkarte", command=t_sk)
+    b2.pack(side="left", padx=2, pady=2)
 
 # Function to show menu on row click
 def show_menu(event):
@@ -263,6 +378,9 @@ def analyze_timtrack_records(records):
 
     timestamps = []
     for row in records:
+        if len(row) < 4:
+            print("analyze_timtrack_records: Skipping invalid record:", row)
+            continue
         date_str    = row[1] # Example: "Do, 22.05.2025"
         start_time  = row[2] # Example: "06:06"
         end_time    = row[3] # Example: "07:51"
@@ -328,6 +446,14 @@ def filter_old_records( timetrack_list, records):
     # Filter the "old" list using the list comprehension
     # The old and new (timetrack) lists might overlap.
     # So leave only records which not yet in timetrack_list to color them black (old).
+    
+    print(f"filter_old_records():")
+    print(f"  ** `old` records: {len(records)}")
+    print(f"  ** timetrack_list records: {len(timetrack_list)}")
+
+    for t in timetrack_list:
+        print(t, len(t))
+
     filtered_records = [
         r for r in records
         if (r[1], r[2]) not in [(t[1], t[2]) for t in timetrack_list]
@@ -427,6 +553,20 @@ if __name__ == "__main__":
     tree.pack(expand=True, fill="both")
 
     add_toolbar( root )
+
+    status_var = tk.StringVar()
+    status_var.set("Initializing…")
+
+    thread = threading.Thread(
+        target  = mod_socket.socket_listener,
+        args    = (
+            root,
+            status_var,
+            t_book_time
+        ),
+    daemon=True )
+    thread.start()
+    print("started thread w callback = ", t_book_time)
 
     # Run the Tkinter loop
     root.mainloop()
