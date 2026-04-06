@@ -89,6 +89,9 @@ class TimeTracking:
         # - convert dates to datetime objects for row[2] and row[3]
         d_timetrack_list_work_copy = []
         for row in d_timetrack_list:
+            if len(row) < 6:
+                print("tw_report: Skipping invalid record:", row)
+                continue
             # format (Do, 22.05.2025)
             dd = row[1].split(", ")[1]
             d_timetrack_list_work_copy.append(
@@ -171,7 +174,8 @@ class TimeTracking:
 
         # compose list of dates which have records
         unique_dates = list(dict.fromkeys(dates))
-        print("Date Range in the unique date list:\n", unique_dates)
+        if 0:
+            print("Date Range in the unique date list:\n", unique_dates)
 
         ################
         # main timetracking loop
@@ -192,25 +196,32 @@ class TimeTracking:
         # 
         list2 = [(row[0], row[2]) for row in td_report_list]
 
+        if 0:
+            print("*" * 30 + " list2")
+            print(list2)
+            print("*" * 30)
+
         # (row[0], row[2]) tuple saves start time and task detail name
         # Find closest match for each datetime between the lists
         # self.timetrack_deviation is dynamically created class member variable ...
         # it is created when tw_report() was called
         self.timetrack_deviation = []   # create deviation list
         self.ts_note_dict = {}          # create start time note dictionary
-        for dt1 in list1:
-            # compare start time (item[0] from list2) with dt1 start time from list 1
-            # and return both items from list2
-            closest_dt, note_text = min(list2, key=lambda item2: abs(dt1 - item2[0]))
-            time_diff_minutes = int((dt1 - closest_dt).total_seconds() / 60)
-            self.timetrack_deviation.append(
-                (dt1,                   # tiso online entry datetime
-                 closest_dt,            # ttplus datetime matching closely dt1
-                 time_diff_minutes,     # 
-                 note_text)
-             )
-            print(f"self.ts_note_dict[{dt1}] = {note_text}")
-            self.ts_note_dict[dt1] = note_text
+        if list2: # only make sense when there is something to compare
+            # otherwise self.timetrack_deviation shall remain empty
+            for dt1 in list1:
+                # compare start time (item[0] from list2) with dt1 start time from list 1
+                # and return both items from list2
+                closest_dt, note_text = min(list2, key=lambda item2: abs(dt1 - item2[0]))
+                time_diff_minutes = int((dt1 - closest_dt).total_seconds() / 60)
+                self.timetrack_deviation.append(
+                    (dt1,                   # tiso online entry datetime
+                     closest_dt,            # ttplus datetime matching closely dt1
+                     time_diff_minutes,     # 
+                     note_text)
+                 )
+                print(f"self.ts_note_dict[{dt1}] = {note_text}")
+                self.ts_note_dict[dt1] = note_text
 
         # convert dates back to strings to make them serializable again
         #for row in d_timetrack_list:
