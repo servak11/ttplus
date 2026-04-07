@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Focus Kanban</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #f4f2ed;
+    --surface:   #ffffff;
+    --border:    #d8d4cc;
+    --border-dk: #b8b2a8;
+    --text:      #1a1814;
+    --text-2:    #6b6560;
+    --text-3:    #9e9890;
+    --accent:    #2a5fff;
+    --accent-bg: #eef2ff;
+
+    --col-backlog: #e8e4de;
+    --col-active:  #dbeafe;
+    --col-review:  #fef3c7;
+    --col-done:    #d1fae5;
+
+    --col-backlog-hdr: #6b6560;
+    --col-active-hdr:  #1d4ed8;
+    --col-review-hdr:  #92400e;
+    --col-done-hdr:    #065f46;
+
+    --col-backlog-bd: #c8c4be;
+    --col-active-bd:  #93c5fd;
+    --col-review-bd:  #fcd34d;
+    --col-done-bd:    #6ee7b7;
+
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+    --radius: 4px;
+    --card-radius: 6px;
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── TOP BAR ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    color: var(--text);
+    text-transform: uppercase;
+  }
+  .logo span { color: var(--accent); }
+
+  .week-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 2px 8px;
+  }
+
+  .header-filter {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .header-filter label {
+    font-size: 12px;
+    color: var(--text-2);
+  }
+
+  #search {
+    font-family: var(--mono);
+    font-size: 12px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    border-radius: var(--radius);
+    padding: 4px 10px;
+    width: 220px;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  #search:focus { border-color: var(--accent); }
+  #search::placeholder { color: var(--text-3); }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-2);
+    cursor: pointer;
+    transition: all 0.12s;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn.primary:hover { background: #1a4eee; }
+
+  /* ── MAIN LAYOUT ── */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    height: calc(100vh - 48px);
+  }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .sidebar-section {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-heading {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    padding: 0 14px 8px;
+  }
+
+  .sidebar-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    border-left: 2px solid transparent;
+    transition: all 0.1s;
+    color: var(--text-2);
+  }
+  .sidebar-item:hover { background: var(--bg); color: var(--text); }
+  .sidebar-item.active { border-left-color: var(--accent); color: var(--accent); background: var(--accent-bg); font-weight: 500; }
+
+  .sidebar-item .dot {
+    width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+  }
+  .dot-active  { background: #2a5fff; }
+  .dot-review  { background: #f59e0b; }
+  .dot-done    { background: #10b981; }
+  .dot-backlog { background: #9e9890; }
+
+  .sidebar-item .count {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+  .stat-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px;
+    text-align: center;
+  }
+  .stat-box .stat-n {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    display: block;
+  }
+  .stat-box .stat-l {
+    font-size: 10px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* ── BOARD ── */
+  .board-area {
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 16px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .column {
+    width: 270px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    max-height: 100%;
+  }
+
+  .col-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: var(--card-radius) var(--card-radius) 0 0;
+    border: 1px solid var(--border);
+    border-bottom: none;
+    background: var(--surface);
+  }
+
+  .col-header .col-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .col-header .col-count {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: auto;
+  }
+
+  .col-body {
+    flex: 1;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-top: 3px solid;
+    border-radius: 0 0 var(--card-radius) var(--card-radius);
+    padding: 8px;
+    min-height: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  /* Column color theming */
+  .col-backlog .col-header { border-top: 3px solid var(--col-backlog-bd); }
+  .col-backlog .col-body   { background: var(--col-backlog); border-color: var(--col-backlog-bd); border-top: none; }
+  .col-backlog .col-label  { color: var(--col-backlog-hdr); }
+  .col-backlog .col-count  { background: var(--col-backlog-bd); color: var(--col-backlog-hdr); }
+  .col-backlog .col-header { border-top: none; border-left: 3px solid var(--col-backlog-bd); }
+
+  .col-active .col-body   { background: var(--col-active); border-color: var(--col-active-bd); border-top: none; }
+  .col-active .col-label  { color: var(--col-active-hdr); }
+  .col-active .col-count  { background: var(--col-active-bd); color: var(--col-active-hdr); }
+  .col-active .col-header { border-top: none; border-left: 3px solid var(--col-active-bd); }
+
+  .col-review .col-body   { background: var(--col-review); border-color: var(--col-review-bd); border-top: none; }
+  .col-review .col-label  { color: var(--col-review-hdr); }
+  .col-review .col-count  { background: var(--col-review-bd); color: var(--col-review-hdr); }
+  .col-review .col-header { border-top: none; border-left: 3px solid var(--col-review-bd); }
+
+  .col-done .col-body   { background: var(--col-done); border-color: var(--col-done-bd); border-top: none; }
+  .col-done .col-label  { color: var(--col-done-hdr); }
+  .col-done .col-count  { background: var(--col-done-bd); color: var(--col-done-hdr); }
+  .col-done .col-header { border-top: none; border-left: 3px solid var(--col-done-bd); }
+
+  /* ── PROJECT CARD ── */
+  .project-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--card-radius);
+    padding: 10px 12px;
+    cursor: grab;
+    transition: box-shadow 0.12s, transform 0.12s;
+    user-select: none;
+    position: relative;
+  }
+  .project-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+    transform: translateY(-1px);
+  }
+  .project-card.sortable-chosen {
+    box-shadow: 0 6px 20px rgba(42,95,255,0.18);
+    transform: rotate(1.5deg) scale(1.02);
+    z-index: 999;
+  }
+  .project-card.sortable-ghost {
+    opacity: 0.35;
+  }
+
+  .card-id {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+    margin-bottom: 4px;
+  }
+
+  .card-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.4;
+    margin-bottom: 8px;
+  }
+
+  .card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    align-items: center;
+  }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    color: var(--text-2);
+    background: var(--bg);
+  }
+
+  .tag.tag-hours {
+    background: #f0f0f0;
+    border-color: #d0d0d0;
+    color: #444;
+  }
+
+  .tag.tag-tasks {
+    border-color: #c8c4be;
+    color: var(--text-2);
+  }
+
+  .tag.tag-warn {
+    background: #fff7ed;
+    border-color: #fdba74;
+    color: #9a3412;
+  }
+
+  .card-footer {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .card-week-bar {
+    flex: 1;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-right: 8px;
+  }
+  .card-week-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+    transition: width 0.3s;
+  }
+
+  .card-hours-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-3);
+    white-space: nowrap;
+  }
+
+  .card-actions {
+    display: none;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .project-card:hover .card-actions { display: flex; }
+  .card-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: all 0.1s;
+  }
+  .card-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── COLUMN PLACEHOLDER ── */
+  .col-placeholder {
+    border: 2px dashed var(--border-dk);
+    border-radius: var(--card-radius);
+    padding: 20px;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    opacity: 0.6;
+  }
+
+  /* ── TASK PANE ── */
+  .task-pane {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 2px solid var(--accent);
+    height: 0;
+    overflow: hidden;
+    transition: height 0.2s ease;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+  }
+  .task-pane.open { height: 300px; }
+
+  .task-pane-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .task-pane-title {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .task-pane-sub {
+    font-size: 12px;
+    color: var(--text-3);
+  }
+
+  .task-pane-close {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 11px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-2);
+    cursor: pointer;
+    border-radius: var(--radius);
+    padding: 2px 8px;
+  }
+
+  .task-pane-body {
+    overflow-y: auto;
+    padding: 12px 16px;
+    flex: 1;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-2);
+  }
+
+  /* ── FILTER BAR ── */
+  .filter-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .filter-bar label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .filter-chip {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 3px 10px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-2);
+    transition: all 0.1s;
+  }
+  .filter-chip:hover { border-color: var(--accent); color: var(--accent); }
+  .filter-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  .spacer { flex: 1; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-dk); border-radius: 3px; }
+
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header>
+  <div class="logo">Focus<span>Kanban</span></div>
+  <div class="week-label" id="week-label">W-- / ----</div>
+  <div class="header-filter">
+    <label>filter</label>
+    <input type="text" id="search" placeholder="project name or id…">
+    <button class="btn primary" onclick="exportWeekReport()">↓ Week Report</button>
+  </div>
+</header>
+
+<!-- ── FILTER BAR ── -->
+<div class="filter-bar">
+  <label>Show:</label>
+  <button class="filter-chip active" data-filter="active" onclick="setFilter('active', this)">Active only</button>
+  <button class="filter-chip" data-filter="recent" onclick="setFilter('recent', this)">Recent (20)</button>
+  <button class="filter-chip" data-filter="all" onclick="setFilter('all', this)">All</button>
+  <div class="spacer"></div>
+  <label style="color:var(--text-3); font-size:11px; font-family:var(--mono);">
+    <span id="visible-count">0</span> projects shown
+  </label>
+</div>
+
+<!-- ── MAIN ── -->
+<div class="main">
+
+  <!-- sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-heading">This week</div>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <span class="stat-n" id="s-active">0</span>
+          <span class="stat-l">Active</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-n" id="s-hours">0h</span>
+          <span class="stat-l">Logged</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-n" id="s-tasks">0</span>
+          <span class="stat-l">Tasks</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-n" id="s-issues">0</span>
+          <span class="stat-l">Issues</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section" style="flex:1;">
+      <div class="sidebar-heading">Focus projects</div>
+      <div id="focus-list"></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-heading">Columns</div>
+      <div class="sidebar-item" onclick="scrollToCol('backlog')">
+        <span class="dot dot-backlog"></span> Backlog
+        <span class="count" id="cnt-backlog">0</span>
+      </div>
+      <div class="sidebar-item active" onclick="scrollToCol('active')">
+        <span class="dot dot-active"></span> Active
+        <span class="count" id="cnt-active">0</span>
+      </div>
+      <div class="sidebar-item" onclick="scrollToCol('review')">
+        <span class="dot dot-review"></span> Review
+        <span class="count" id="cnt-review">0</span>
+      </div>
+      <div class="sidebar-item" onclick="scrollToCol('done')">
+        <span class="dot dot-done"></span> Done
+        <span class="count" id="cnt-done">0</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- board -->
+  <div class="board-area" id="board">
+    <div class="column col-backlog" id="col-backlog">
+      <div class="col-header">
+        <span class="col-label">Backlog</span>
+        <span class="col-count" id="hdr-cnt-backlog">0</span>
+      </div>
+      <div class="col-body" id="list-backlog" data-status="backlog"></div>
+    </div>
+
+    <div class="column col-active" id="col-active">
+      <div class="col-header">
+        <span class="col-label">Active</span>
+        <span class="col-count" id="hdr-cnt-active">0</span>
+      </div>
+      <div class="col-body" id="list-active" data-status="active"></div>
+    </div>
+
+    <div class="column col-review" id="col-review">
+      <div class="col-header">
+        <span class="col-label">Review / Report</span>
+        <span class="col-count" id="hdr-cnt-review">0</span>
+      </div>
+      <div class="col-body" id="list-review" data-status="review"></div>
+    </div>
+
+    <div class="column col-done" id="col-done">
+      <div class="col-header">
+        <span class="col-label">Done</span>
+        <span class="col-count" id="hdr-cnt-done">0</span>
+      </div>
+      <div class="col-body" id="list-done" data-status="done"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── TASK PANE ── -->
+<div class="task-pane" id="task-pane">
+  <div class="task-pane-header">
+    <span class="task-pane-title" id="pane-title">—</span>
+    <span class="task-pane-sub" id="pane-sub"></span>
+    <button class="task-pane-close" onclick="closePane()">✕ close</button>
+  </div>
+  <div class="task-pane-body" id="pane-body"></div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   DATA MODEL
+   In production: replace PROJECTS with data from
+   Flask: const PROJECTS = {{ projects | tojson }};
+   ═══════════════════════════════════════════════ */
+
+const PROJECTS = [
+  {
+    id: "17742",
+    title: "Add Kanban Automation",
+    status: "active",
+    tasks: 10,
+    hours_logged: 14.5,
+    hours_planned: 20,
+    last_active: "2025-06-12",
+    issues: 1,
+    notes: "## Add Kanban Automation\n\nBuilding project-centric Kanban board with SortableJS.\n\n**ADR-01** through **ADR-08** defined and approved.\n\n### Open issues\n- Missing end times on 2 tasks (defaulting to start time)\n- Notes field inconsistent across older tasks"
+  },
+  {
+    id: "CR-W24",
+    title: "Code Reviews (persistent)",
+    status: "active",
+    tasks: 23,
+    hours_logged: 6.0,
+    hours_planned: 8,
+    last_active: "2025-06-13",
+    issues: 0,
+    notes: "## Code Reviews\n\nWeekly persistent activity. Includes PR reviews across all active teams.\n\n- W24: 6 PRs reviewed\n- Focus: API gateway changes, auth layer refactor"
+  },
+  {
+    id: "15891",
+    title: "API Gateway Refactor",
+    status: "review",
+    tasks: 8,
+    hours_logged: 18.0,
+    hours_planned: 16,
+    last_active: "2025-06-10",
+    issues: 0,
+    notes: "## API Gateway Refactor\n\nMigrated legacy gateway to new service mesh.\n\n**Status**: Implementation complete, awaiting sign-off.\n\nReport draft pending — need to log final 2h of integration testing."
+  },
+  {
+    id: "16230",
+    title: "Auth Layer — MFA Integration",
+    status: "active",
+    tasks: 5,
+    hours_logged: 7.5,
+    hours_planned: 12,
+    last_active: "2025-06-11",
+    issues: 2,
+    notes: "## MFA Integration\n\nAdding TOTP + hardware key support.\n\n### Issues\n- 2 tasks missing end times\n- Goal field empty on task #3"
+  },
+  {
+    id: "15002",
+    title: "DB Migration — Postgres 16",
+    status: "done",
+    tasks: 12,
+    hours_logged: 22.0,
+    hours_planned: 20,
+    last_active: "2025-06-01",
+    issues: 0,
+    notes: "## Postgres 16 Migration\n\nCompleted migration for all production schemas.\n\nFinal report submitted to project tracker."
+  },
+  {
+    id: "16780",
+    title: "CI Pipeline Hardening",
+    status: "backlog",
+    tasks: 3,
+    hours_logged: 0,
+    hours_planned: 10,
+    last_active: "2025-05-20",
+    issues: 0,
+    notes: "## CI Pipeline Hardening\n\nPlanned for next sprint. Key tasks:\n- Add SAST scanning\n- Parallelize test matrix\n- Cache layer optimisation"
+  },
+  {
+    id: "14450",
+    title: "Frontend Design System",
+    status: "backlog",
+    tasks: 6,
+    hours_logged: 2.0,
+    hours_planned: 24,
+    last_active: "2025-04-15",
+    issues: 1,
+    notes: "## Design System\n\nBacklogged — deprioritised after Q1 reshuffle."
+  },
+  {
+    id: "16901",
+    title: "Observability Stack — OTel",
+    status: "active",
+    tasks: 7,
+    hours_logged: 9.0,
+    hours_planned: 14,
+    last_active: "2025-06-12",
+    issues: 0,
+    notes: "## OpenTelemetry Integration\n\nInstrumenting backend services with OTel SDK.\n\nNext: add trace sampling config."
+  },
+  {
+    id: "17100",
+    title: "Security Audit — Q2",
+    status: "review",
+    tasks: 4,
+    hours_logged: 11.0,
+    hours_planned: 12,
+    last_active: "2025-06-08",
+    issues: 0,
+    notes: "## Q2 Security Audit\n\nFull pen-test completed. 3 medium findings, 0 critical.\n\nWaiting on remediations sign-off from CTO."
+  },
+  {
+    id: "17340",
+    title: "Docs Overhaul — API Reference",
+    status: "backlog",
+    tasks: 2,
+    hours_logged: 0,
+    hours_planned: 8,
+    last_active: "2025-05-30",
+    issues: 0,
+    notes: "## API Reference Docs\n\nNo tasks started. Tentatively assigned next cycle."
+  }
+];
+
+/* ═══════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════ */
+let state = {
+  projects: JSON.parse(JSON.stringify(PROJECTS)),
+  filter: 'active',
+  search: ''
+};
+
+/* ═══════════════════════════════════════════════
+   HELPERS
+   ═══════════════════════════════════════════════ */
+function getWeekLabel() {
+  const now = new Date();
+  const jan1 = new Date(now.getFullYear(), 0, 1);
+  const week = Math.ceil(((now - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+  return `W${String(week).padStart(2,'0')} / ${now.getFullYear()}`;
+}
+
+function simpleMarkdown(md) {
+  if (!md) return '<em style="color:var(--text-3)">No notes.</em>';
+  return md
+    .replace(/^## (.+)$/gm, '<h3 style="font-size:14px;font-weight:600;margin:8px 0 4px;color:var(--text)">$1</h3>')
+    .replace(/^### (.+)$/gm, '<h4 style="font-size:13px;font-weight:500;margin:6px 0 3px;color:var(--text)">$1</h4>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^- (.+)$/gm, '<li style="margin-left:16px;margin-bottom:2px">$1</li>')
+    .replace(/\n\n/g, '<br><br>')
+    .replace(/\n/g, '<br>');
+}
+
+function hoursBar(logged, planned) {
+  if (!planned) return 0;
+  return Math.min(100, Math.round((logged / planned) * 100));
+}
+
+function issueText(n) {
+  if (n === 0) return null;
+  return n === 1 ? '1 issue' : `${n} issues`;
+}
+
+/* ═══════════════════════════════════════════════
+   FILTER LOGIC
+   ═══════════════════════════════════════════════ */
+function getVisible() {
+  let projs = state.projects;
+  if (state.filter === 'active') {
+    projs = projs.filter(p => p.status === 'active' || p.status === 'review');
+  } else if (state.filter === 'recent') {
+    projs = [...projs]
+      .sort((a,b) => new Date(b.last_active) - new Date(a.last_active))
+      .slice(0, 20);
+  }
+  if (state.search) {
+    const q = state.search.toLowerCase();
+    projs = projs.filter(p =>
+      p.title.toLowerCase().includes(q) || p.id.toLowerCase().includes(q)
+    );
+  }
+  return projs;
+}
+
+/* ═══════════════════════════════════════════════
+   RENDER
+   ═══════════════════════════════════════════════ */
+function renderCard(p) {
+  const pct = hoursBar(p.hours_logged, p.hours_planned);
+  const warn = issueText(p.issues);
+  const card = document.createElement('div');
+  card.className = 'project-card';
+  card.dataset.id = p.id;
+
+  card.innerHTML = `
+    <div class="card-id">#${p.id}</div>
+    <div class="card-title">${p.title}</div>
+    <div class="card-meta">
+      <span class="tag tag-tasks">⊞ ${p.tasks} tasks</span>
+      <span class="tag tag-hours">⏱ ${p.hours_logged}h / ${p.hours_planned}h</span>
+      ${warn ? `<span class="tag tag-warn">⚠ ${warn}</span>` : ''}
+    </div>
+    <div class="card-footer">
+      <div class="card-week-bar"><div class="card-week-bar-fill" style="width:${pct}%"></div></div>
+      <span class="card-hours-label">${pct}%</span>
+    </div>
+    <div class="card-actions">
+      <button class="card-btn" onclick="openPane('${p.id}', event)">notes</button>
+      <button class="card-btn" onclick="markDone('${p.id}', event)">→ done</button>
+    </div>
+  `;
+  return card;
+}
+
+function renderBoard() {
+  const cols = ['backlog','active','review','done'];
+  const lists = {};
+  cols.forEach(c => {
+    const el = document.getElementById('list-' + c);
+    el.innerHTML = '';
+    lists[c] = el;
+  });
+
+  const visible = getVisible();
+  const counts = { backlog: 0, active: 0, review: 0, done: 0 };
+
+  visible.forEach(p => {
+    const col = lists[p.status] || lists['backlog'];
+    col.appendChild(renderCard(p));
+    counts[p.status] = (counts[p.status] || 0) + 1;
+  });
+
+  cols.forEach(c => {
+    const n = counts[c] || 0;
+    document.getElementById('hdr-cnt-' + c).textContent = n;
+    document.getElementById('cnt-' + c).textContent = n;
+    if (n === 0) {
+      const ph = document.createElement('div');
+      ph.className = 'col-placeholder';
+      ph.textContent = 'drop projects here';
+      lists[c].appendChild(ph);
+    }
+  });
+
+  document.getElementById('visible-count').textContent = visible.length;
+  updateSidebar();
+  initSortable();
+}
+
+function updateSidebar() {
+  const active = state.projects.filter(p => p.status === 'active');
+  document.getElementById('s-active').textContent = active.length;
+
+  const totalHours = state.projects
+    .filter(p => p.status === 'active' || p.status === 'review')
+    .reduce((s, p) => s + p.hours_logged, 0);
+  document.getElementById('s-hours').textContent = totalHours.toFixed(1) + 'h';
+
+  const totalTasks = state.projects
+    .filter(p => p.status === 'active' || p.status === 'review')
+    .reduce((s, p) => s + p.tasks, 0);
+  document.getElementById('s-tasks').textContent = totalTasks;
+
+  const totalIssues = state.projects.reduce((s, p) => s + p.issues, 0);
+  document.getElementById('s-issues').textContent = totalIssues;
+
+  // Focus list — top 5 active by last_active
+  const focus = [...active]
+    .sort((a,b) => new Date(b.last_active) - new Date(a.last_active))
+    .slice(0, 5);
+
+  const fl = document.getElementById('focus-list');
+  fl.innerHTML = '';
+  focus.forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'sidebar-item';
+    item.innerHTML = `
+      <span class="dot dot-active"></span>
+      <span style="font-size:12px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;">${p.title}</span>
+      <span class="count">${p.hours_logged}h</span>
+    `;
+    item.onclick = () => openPane(p.id);
+    fl.appendChild(item);
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   SORTABLE
+   ═══════════════════════════════════════════════ */
+let sortables = [];
+function initSortable() {
+  sortables.forEach(s => s.destroy());
+  sortables = [];
+
+  ['backlog','active','review','done'].forEach(status => {
+    const el = document.getElementById('list-' + status);
+    const s = Sortable.create(el, {
+      group: 'projects',
+      animation: 150,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      onEnd(evt) {
+        const id = evt.item.dataset.id;
+        const newStatus = evt.to.dataset.status;
+        const proj = state.projects.find(p => p.id === id);
+        if (proj && proj.status !== newStatus) {
+          proj.status = newStatus;
+          // In production: POST /api/projects/{id}/status  { status: newStatus }
+          console.log(`[kanban] ${id} → ${newStatus}`);
+          renderBoard();
+        }
+        // remove placeholder if present
+        const ph = evt.to.querySelector('.col-placeholder');
+        if (ph) ph.remove();
+      }
+    });
+    sortables.push(s);
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   TASK PANE
+   ═══════════════════════════════════════════════ */
+function openPane(id, evt) {
+  if (evt) evt.stopPropagation();
+  const p = state.projects.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('pane-title').textContent = `#${p.id} — ${p.title}`;
+  document.getElementById('pane-sub').textContent = `${p.tasks} tasks · ${p.hours_logged}h logged`;
+  document.getElementById('pane-body').innerHTML = simpleMarkdown(p.notes);
+  document.getElementById('task-pane').classList.add('open');
+}
+
+function closePane() {
+  document.getElementById('task-pane').classList.remove('open');
+}
+
+/* ═══════════════════════════════════════════════
+   ACTIONS
+   ═══════════════════════════════════════════════ */
+function markDone(id, evt) {
+  if (evt) evt.stopPropagation();
+  const p = state.projects.find(x => x.id === id);
+  if (p) { p.status = 'done'; renderBoard(); }
+}
+
+function setFilter(f, btn) {
+  state.filter = f;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  renderBoard();
+}
+
+function scrollToCol(col) {
+  document.getElementById('col-' + col).scrollIntoView({ behavior: 'smooth', inline: 'start' });
+}
+
+function exportWeekReport() {
+  const active = state.projects.filter(p => p.status === 'active' || p.status === 'review');
+  const lines = ['WEEK REPORT — ' + getWeekLabel(), ''];
+  active.forEach(p => {
+    lines.push(`[${p.id}] ${p.title}`);
+    lines.push(`  Hours logged: ${p.hours_logged}h / planned: ${p.hours_planned}h`);
+    lines.push(`  Tasks: ${p.tasks} | Issues: ${p.issues}`);
+    lines.push('');
+  });
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `week-report-${getWeekLabel().replace(' / ','-')}.txt`;
+  a.click();
+}
+
+/* ═══════════════════════════════════════════════
+   SEARCH
+   ═══════════════════════════════════════════════ */
+document.getElementById('search').addEventListener('input', e => {
+  state.search = e.target.value.trim();
+  renderBoard();
+});
+
+/* ═══════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════ */
+document.getElementById('week-label').textContent = getWeekLabel();
+renderBoard();
+</script>
+</body>
+</html>
