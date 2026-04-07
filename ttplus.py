@@ -151,6 +151,10 @@ from mod_detaileditor import TaskDetailEditor
 
 from util.ts import *
 
+from mod_flask import NoteServer
+note_server = NoteServer()
+note_server.start()
+
 # Task 1
 ## Design the Time Tracker
 # Create application window
@@ -649,6 +653,16 @@ def on_table2_select(event):
 
     tde.load_data( d_entry )
 
+    """
+    User clicks row in Table 2
+      → on_table2_select() fires
+        → tde.load_data(d_entry)       # loads detail into editor
+        → push_note_to_browser()       # pushes to Flask
+          → mod_flask POST /note       # updates shared state
+            → browser polls 4s later  # renders new note
+    """
+    push_note_to_browser()
+
 def show_about():
     from controls.about import AboutDialog
     AboutDialog(master=root)
@@ -674,6 +688,23 @@ def show_report():
     # sort list
     print("\n".join(sorted(report_list)))
 
+def push_note_to_browser():
+    """Push the currently selected task detail note to the Flask viewer."""
+    try:
+        task_id = table1.item(table1.selection(), "values")[0]
+        task_name = database["work_tasks"][task_id]["tnm"]
+    except (IndexError, KeyError, TypeError):
+        task_name = ""
+
+    note_server.show_note(
+        note_text = tde.get_note(),
+        meta = {
+            "project": task_name,
+            "task":    tde.get_name() if hasattr(tde, "get_name") else "",
+            "start":   tde.get_start_time(),
+            "end":     tde.get_end_time(),
+        }
+    )
 
 def tt_test_action():
     select_task_by_id("e8ad4")
@@ -742,6 +773,7 @@ menu_bar.add_command(label="Work Report", command=show_report)
 menu_bar.add_command(label="Detail Effort Report", command=show_task_report)
 menu_bar.add_command(label="Test", command=tt_test_action)
 #menu_bar.add_command(label="TW", command=tw_report)
+menu_bar.add_command(label="View Note in Browser", command=push_note_to_browser)
 
 # Table 1 (Work Tasks)
 frame1 = ttk.LabelFrame(root, text="Work Tasks")
