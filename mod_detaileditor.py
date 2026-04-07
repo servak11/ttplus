@@ -1,10 +1,10 @@
 ## ttplus - work time tracker
 #
-## The Task Detail editor 
+## The Task Detail editor
 # class TaskDetailEditor(tk.LabelFrame):
 #
 # The Task Detail editor shall be inside a LabelFrame named "Detail Editor" with padding 5
-# it shall contain two lines of controls 
+# it shall contain two lines of controls
 # - first line of controls shall have multiple controls:
 # -- a Label showing current date DD.MM.YYYY
 # -- a TimeSpinControl to edit the hours of task starting time,
@@ -44,7 +44,7 @@ class TaskDetailEditor(tk.LabelFrame):
 
         # Second Line of Controls
         self._create_note_detail_editor()
-        
+
         self.timestamp = ""
         ## Reference to the Database entry currently loaded into the editor
         self.d1 = None
@@ -88,13 +88,13 @@ class TaskDetailEditor(tk.LabelFrame):
         # TimeSpinControls for start and end times of the note detail - editable
         self.start_hour = TimeSpinControl(fr, max_value=23)
         self.start_hour.pack(side="left", padx=5)
-        
+
         self.start_minute = TimeSpinControl(fr, max_value=59)
         self.start_minute.pack(side="left", padx=5)
 
         self.end_hour = TimeSpinControl(fr, max_value=23)
         self.end_hour.pack(side="left", padx=5)
-        
+
         self.end_minute = TimeSpinControl(fr, max_value=59)
         self.end_minute.pack(side="left", padx=5)
 
@@ -110,14 +110,14 @@ class TaskDetailEditor(tk.LabelFrame):
     # Check if widget supports config method and disable widget
     # this is to avoid generation of exceptions in onchange when note not loaded
     def _disable_widgets(self,frame):
-        for widget in frame.winfo_children():  
+        for widget in frame.winfo_children():
             if hasattr(widget, "config"):
                 try:
                     widget.config(state=tk.DISABLED)
                 except tk.TclError:
                     pass  # Ignore Frames that do not support 'state'
     def _enable_widgets(self,frame):
-        for widget in frame.winfo_children():  
+        for widget in frame.winfo_children():
             if hasattr(widget, "config"):
                 try:
                     widget.config(state=tk.NORMAL)
@@ -203,7 +203,7 @@ class TaskDetailEditor(tk.LabelFrame):
         for match in hyperlink_matches:
             count_links = count_links + 1
             # get absolute position in the entire text
-            start_pos = match.start() 
+            start_pos = match.start()
             end_pos = match.end()
 
             # convert absolute position to Tkinter index (line.character)
@@ -241,11 +241,15 @@ class TaskDetailEditor(tk.LabelFrame):
                 Args:
                     ticket_number: str
                 """
-                issue_url = settings["issue_url"]
-                if not issue_url.endswith('/'):
-                    issue_url += '/'
-                issue_url += ticket_number
-                webbrowser.open(issue_url)
+                issue_url = settings.get("issue_url")
+                if issue_url is None:
+                    print("No ticket URL configured in settings.json, cannot open ticket link")
+                    pass
+                else:
+                    if not issue_url.endswith('/'):
+                        issue_url += '/'
+                    issue_url += ticket_number
+                    webbrowser.open(issue_url)
 
             self.notes.tag_bind(tag_name, "<Button-1>", handler)
 
@@ -297,15 +301,30 @@ class TaskDetailEditor(tk.LabelFrame):
         # but did not find way to restore it!
         #self.first_line.pack_forget()  # Hide the frame from the layout
 
+    def _note_template(self):
+        """
+        MD template injected into new/empty notes.
+        Structured for AI readability (PaybackForecaster, HistoryScanner)
+        and for consistent human reporting.
+        """
+        return (
+            "## Goal      <!-- definition of done -->\n\n"
+            "## Why       <!-- idea or issue -->\n\n"
+            "## Ticket link\n\n"
+            "## Notes\n\n"
+            "## Surprises <!-- scope changes, blockers, discoveries -->\n\n"
+            ""
+        )
+
     def load_data(self, dict_data):
         """
         Load the provided dictionary structure into the editor.
 
-        This method processes the input dictionary and populates the editor with its data. 
+        This method processes the input dictionary and populates the editor with its data.
         The dictionary should follow a specific structure compatible with the editor's requirements.
 
         Args:
-            dict_data (dict): A dictionary containing the data to be loaded into the editor. 
+            dict_data (dict): A dictionary containing the data to be loaded into the editor.
                               The keys and values in the dictionary
                               must conform to the editor's format.
 
@@ -342,11 +361,24 @@ class TaskDetailEditor(tk.LabelFrame):
             note_timestamp = self.d1["Start Time"]
             self.date_control.set_date(note_timestamp)
             # populate times and task detail name
-            self.set_name        (self.d1["What was done"])
+            #self.set_name        (self.d1["What was done"])
+            name = self.d1.get("What was done", "")
+            if name == "add detail ...":
+                self.set_name("")
+            else:
+                self.set_name(name)
             self.set_start_time  (self.d1["Start Time"])
             self.set_end_time    (self.d1["End Time"])
             ### it is not bad if the note text was not available, would be empty
-            self.set_note(self.d1.get("note", ""))
+            existing_note = self.d1.get("note", "").strip()
+            if not existing_note:
+                # insert template for the new note
+                self.set_note(self._note_template())
+            else:
+                # load the existing note
+                self.set_note(existing_note)
+
+
 
             # TODO then we do not need the below code
             # set the note text
@@ -489,7 +521,7 @@ class TaskDetailEditor(tk.LabelFrame):
     def update_time(self):
         """
         Updates the spinbox to show the current system time.
-        
+
         Run set_end_time() for a started task note every minute.
         This automatically counts the time spent for the task.
         Only works for the task detail which was just created.
