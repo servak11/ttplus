@@ -128,7 +128,7 @@
 # - The full `Task ID` will be used for retrieval and sorting, while the hashed ID will simplify access and display.
 #
 ## Implementation Details:
-# - **Task Creation:** 
+# - **Task Creation:**
 # - When a new task is created, generate both the `Task ID` (date-time stamp) and its hashed version.
 # - Use the hash in the table (`iid`) and database for efficient handling.
 #
@@ -143,13 +143,15 @@ import tkinter as tk
 from tkinter import ttk
 from tkinter import PhotoImage
 
-from mod_table import TableWidget
 import const
 
 from mod_db import Database
 from mod_detaileditor import TaskDetailEditor
 
 from util.ts import *
+
+from controls.statusbar import StatusBar
+from controls.tasktable import TableWidget
 
 from web.flask_server import NoteServer
 
@@ -355,7 +357,7 @@ def update_task_name(event=None):
 # - restore from json database, decompress and display in the tkinter text fiels
 def update_task_note(event=None):
     selected_item = table2.selection()
-    
+
     # TODO no need to check selected_item,
     # it is only possible to land here if it was selected
     #if selected_item:
@@ -395,7 +397,7 @@ def update_task_details(d_new_details):
     #print("d_new_details =",d_new_details)
     selected_item = table2.selection()
     # print("selected_item =",selected_item)
-    
+
     # TODO no need to check selected_item,
     # it is only possible to land here if it was selected
     #if selected_item:
@@ -412,7 +414,7 @@ def update_task_details(d_new_details):
         #print("!",detail_list.__class__,"detail_list contains", len(detail_list), "details, but selected item", (detail_index+1) )
         #print("Placeholder Modified!")
         #
-        # Attention d_new_details contains only modified details, 
+        # Attention d_new_details contains only modified details,
         # therefore we need to use tde.get_data() to obtain full details and add it to database
         # The database entry was already created for the details in the TDE
         # when the on_table2_select() was triggered, just take that data back!
@@ -447,7 +449,7 @@ def update_task_details(d_new_details):
         dm_hm(tde.d1["Start Time"]),
         dm_hm(tde.d1["End Time"]),
         str(tde.d1["What was done"])
-        
+
     )
     ### UPDATE existing detail entry into the table view
     # because the values were updated directly in the database record provided by reference to the editor,
@@ -496,7 +498,7 @@ cur_selected_item = None
 # Here
 # task_id   = si["values"][0]
 # task_name = si["values"][1]
-# 
+#
 def on_table1_select(event):
     tde.stop_clock()
     selected_item = table1.selection()
@@ -647,7 +649,7 @@ def on_table2_select(event):
             )
             db_sts = get_dt(d_entry["Start Time"])
             status_bar. s_act(
-                db_sts, 
+                db_sts,
                 tracker.check_deviation(d_entry)
             )
 
@@ -763,7 +765,6 @@ task_placeholder_id = "00000"
 
 # Create status bar and print database info there initially
 # the class StatusBar calls pack()
-from mod_statusbar import StatusBar
 info = (str(database["work_tasks"].__class__),"database contains",str(len(database["work_tasks"])),"records")
 status_bar = StatusBar(root)
 
