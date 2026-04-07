@@ -151,7 +151,8 @@ from mod_detaileditor import TaskDetailEditor
 
 from util.ts import *
 
-from mod_flask import NoteServer
+from web.flask_server import NoteServer
+
 note_server = NoteServer()
 note_server.start()
 
