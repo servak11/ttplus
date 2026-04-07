@@ -1,0 +1,20 @@
+# ttplus requirements
+# install: pip install -r requirements.txt
+
+# ── web / Flask layer ──────────────────────────────────────────────
+flask>=3.0
+markdown2>=2.4          # MD → HTML in mod_flask.py
+
+# ── AI layer (Phase 4 — comment out until needed) ──────────────────
+# anthropic>=0.25       # Claude API for hypothesis enrichment
+# voyageai>=0.2         # embeddings for HistoryScanner
+
+# ── standard library — no install needed ──────────────────────────
+# tkinter               # built into Python on Windows/Linux
+# threading
+# webbrowser
+# hashlib
+# json
+# re
+# datetime
+# urllib.request
