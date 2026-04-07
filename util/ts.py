@@ -22,7 +22,7 @@ def dm_hm(ts):
     """
     return ts[6:8] + "." + ts[4:6] +" "+ ts[8:10] + ":" + ts[10:12]
 
-def get_dt(ts, fmt = FMT_LONG):
+def get_dt(ts : str, fmt = FMT_LONG):
     """
     Return datetime object for the timestamp
 
@@ -34,7 +34,7 @@ def get_dt(ts, fmt = FMT_LONG):
     """
     return datetime.strptime( ts, fmt)
 
-def get_ts( dt = None, fmt = FMT_LONG):
+def get_ts( dt : datetime = None, fmt = FMT_LONG):
     """
     Return time in "long" format, a text timestamp
 
