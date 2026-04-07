@@ -15,7 +15,7 @@ from tkinter import ttk
 
 # starter control
 import threading
-import mod_socket
+from web.socket_listener import socket_listener
 
 
 
@@ -42,7 +42,7 @@ This is the Zeiterfassung menu as of 28.01.2026
 """
 
 
-# test script to check sanity of the data in the list 
+# test script to check sanity of the data in the list
 def find_unserializable(obj, path="root"):
     if isinstance(obj, dict):
         for k, v in obj.items():
@@ -159,9 +159,9 @@ def t_book_time():
     ===================
 
     booking page consists of 3 tabs "reiters"
-    - buchung 
+    - buchung
     - gbuchung
-    - abfrage 
+    - abfrage
 
     <div class="tab-pane pl-3 abfrage reiter" role="tabpanel" id="abfrage" aria-expanded="false"><container>
     ...
@@ -192,15 +192,15 @@ def t_book_time():
         # and Remove the 'active' class using JavaScript from buchung
         # and Use JavaScript to add the "active" class to gbuchung and abfrage
         # and this way we see all needed info -- but not the bookign button right?
-        # 
+        #
         # To display only the two tables (tblgetBuch and tblabfrage)
         # inside the container <div class="navcontainer">,
         # and overwrite any other content inside that container using Selenium,
         # use JavaScript injection via execute_script.
-        # 
+        #
         #div = t.get_byid("buchung")
         #d.execute_script("arguments[0].classList.remove('active');", div)
-        # 
+        #
         # activete getatigte buchungen
         #div = t.get_byid("li_abfrage")
         div = t.EW("li_abfrage")
@@ -226,7 +226,7 @@ def t_book_time():
 def t_log_time():
     """
     This is the main application functionality: log work time (timetrack)
-    The time logging happens when I log on and log off in the booking page, 
+    The time logging happens when I log on and log off in the booking page,
     and therefore the times are stored in the tool
 
     1. read_timetrack_list() from the tool in the browser
@@ -238,7 +238,7 @@ def t_log_time():
        - the new records found in brower will display in blue
 
     3. update_timetracking( tracker )
-       - the 
+       - the
     """
     global t
     global tree
@@ -446,7 +446,7 @@ def filter_old_records( timetrack_list, records):
     # Filter the "old" list using the list comprehension
     # The old and new (timetrack) lists might overlap.
     # So leave only records which not yet in timetrack_list to color them black (old).
-    
+
     print(f"filter_old_records():")
     print(f"  ** `old` records: {len(records)}")
     print(f"  ** timetrack_list records: {len(timetrack_list)}")
@@ -558,7 +558,7 @@ if __name__ == "__main__":
     status_var.set("Initializing…")
 
     thread = threading.Thread(
-        target  = mod_socket.socket_listener,
+        target  = socket_listener,
         args    = (
             root,
             status_var,
@@ -570,4 +570,3 @@ if __name__ == "__main__":
 
     # Run the Tkinter loop
     root.mainloop()
-

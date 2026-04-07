@@ -694,6 +694,9 @@ def show_report():
     # sort list
     print("\n".join(sorted(report_list)))
 
+
+note_shown = False
+
 def push_note_to_browser():
     """Push the currently selected task detail note to the Flask viewer."""
     try:
@@ -702,15 +705,18 @@ def push_note_to_browser():
     except (IndexError, KeyError, TypeError):
         task_name = ""
 
-    note_server.show_note(
-        note_text = tde.get_note(),
-        meta = {
-            "project": task_name,
-            "task":    tde.get_name() if hasattr(tde, "get_name") else "",
-            "start":   tde.get_start_time(),
-            "end":     tde.get_end_time(),
-        }
-    )
+    global note_shown
+    if not note_shown:
+        note_shown = True # do not start the server again if it was already started
+        note_server.show_note(
+            note_text = tde.get_note(),
+            meta = {
+                "project": task_name,
+                "task":    tde.get_name() if hasattr(tde, "get_name") else "",
+                "start":   tde.get_start_time(),
+                "end":     tde.get_end_time(),
+            }
+        )
 
 def tt_test_action():
     select_task_by_id("e8ad4")
