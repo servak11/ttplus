@@ -3,6 +3,11 @@ p_d="Menlo0104#ak%1a"
 
 import json
 
-with open("settings.json") as f:
-    settings = json.load(f)
-    
+settings = {}
+
+try:
+    with open("settings.json") as f:
+        settings = json.load(f)
+except FileNotFoundError:
+    settings = {
+    }
