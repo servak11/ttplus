@@ -478,8 +478,8 @@ class TaskDetailEditor(tk.LabelFrame):
     def get_start_time(self):
         # Extract existing date from the stored timestamp
         d = self.timestamp[:8]  # YYYYMMDD
-        h = self.start_hour.get()
-        m = self.start_minute.get()
+        h = self.start_hour.get() or "0"
+        m = self.start_minute.get() or "0"
         return f"{d}{int(h):02}{int(m):02}00"
 
     def set_start_time(self, timestamp):
@@ -495,8 +495,8 @@ class TaskDetailEditor(tk.LabelFrame):
 
     def get_end_time(self):
         d = self.timestamp[:8]  # YYYYMMDD
-        h = self.end_hour.get()
-        m = self.end_minute.get()
+        h = self.end_hour.get() or "0"
+        m = self.end_minute.get() or "0"
         return f"{d}{int(h):02}{int(m):02}00"
 
     def set_end_time(self, timestamp):
