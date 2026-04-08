@@ -4,6 +4,21 @@
 #
 import json
 import os
+import logging
+
+log = logging.getLogger("db")
+log.setLevel(logging.INFO)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+#console_handler.setFormatter(CustomFormatter())
+#console_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s: %(message)s'))
+formatter = logging.Formatter(
+    fmt="%(asctime)s (%(filename)s) / %(message)s",
+    datefmt="%H:%M"
+)
+console_handler.setFormatter(formatter)
+log.addHandler(console_handler)
+
 
 class Database:
     def __init__(self, filename="tasks.json"):
@@ -44,5 +59,6 @@ class Database:
         try:
             with open(self.filename, "w") as file:
                 json.dump(data, file, indent=4)
+            log.info("db.save_data(database)")
         except Exception as e:
             print(f"Error saving data: {e}")
