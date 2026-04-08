@@ -1149,28 +1149,32 @@ function buildWeekReport() {
 
   const totalMin = results.reduce((s, r) => s + r.weekMin, 0);
   const totalH = (totalMin / 60).toFixed(1);
+  const sep_s = '┌──────────────────────────────────┐';
+  const sep_e = '└──────────────────────────────────┘';
   const sep = '──────────────────────────────────';
-
+  const sep21 = '════════════════════════════════';
+  const sep2 = '╞══════════════════════════════════╡';
   // Plain text
-  const lines = [
-    //`WEEK REPORT — ${getWeekLabel()}`,
-    `Total: ${totalH}h`, 
-    sep];
+  const lines = [sep_s,
+    `┆ WEEK REPORT — ${getWeekLabel()}`,
+    `┆ Total: ${totalH}h`, 
+  ];
   results.forEach(r => {
     const h = (r.weekMin / 60).toFixed(1);
     const pct = totalMin > 0 ? Math.round((r.weekMin / totalMin) * 100) : 0;
-    lines.push(`[${r.id}] ${r.title}`);
-    lines.push(`  ${pct}%  ·  ${h}h`);
+    lines.push(sep2);
+    lines.push(`┆ [${r.id}] ${r.title}`);
+    lines.push(`┆   ${pct}%  ·  ${h}h`);
     r.details.forEach(d => {
-      lines.push(`  - ${d.what} (${d.min}min)`);
+      lines.push(`┆  - ${d.what} (${d.min}min)`);
     });
-    lines.push('');
+    //lines.push('');
   });
-  lines.push(sep);
+  lines.push(sep_e);
   const text = lines.join('\n');
 
   // HTML
-  let html = `<div style="margin-bottom:8px;"><strong>WEEK REPORT — ${getWeekLabel()}</strong><br>Total: <strong>${totalH}h</strong></div>`;
+  let html = `<div style="margin-bottom:8px;"><strong><!--WEEK REPORT — ${getWeekLabel()}</strong><br> -->Total: <strong>${totalH}h</strong></div>`;
   html += `<div style="border-top:2px solid var(--border);margin:8px 0;"></div>`;
 
   if (results.length === 0) {
