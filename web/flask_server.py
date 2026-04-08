@@ -27,6 +27,7 @@ import webbrowser
 import markdown2
 import json
 import os
+import re
 from flask import Flask, request, jsonify, render_template_string, send_file
 from datetime import datetime
 
@@ -396,6 +397,40 @@ def _last_active(details: list) -> str:
     return ""
 
 
+def _duration_min(start: str, end: str) -> int:
+    """Compute duration in minutes between two 'YYYYMMDDHHmmSS' timestamps."""
+    try:
+        s = datetime.strptime(start[:12], "%Y%m%d%H%M")
+        e = datetime.strptime(end[:12], "%Y%m%d%H%M")
+        diff = (e - s).total_seconds() / 60
+        return max(0, int(diff))
+    except Exception:
+        return 0
+
+
+def _has_goal(note_text: str) -> bool:
+    """Check if note has actual content after '## Goal'."""
+    return bool(re.search(r'## Goal[^\n]*\n\s*\S', note_text))
+
+
+def _build_detail(d: dict) -> dict:
+    """Build a single detail dict for the kanban JS."""
+    note_raw = d.get("note", "")
+    what = d.get("What was done", "")
+    start = d.get("Start Time", "")
+    end = d.get("End Time", "")
+    return {
+        "start":        _fmt_dt(start),
+        "end":          _fmt_dt(end),
+        "what":         what,
+        "note_html":    _render_md(note_raw),
+        "note_raw":     note_raw,
+        "duration_min": _duration_min(start, end),
+        "has_goal":     _has_goal(note_raw),
+        "has_what":     bool(what.strip()) and what.strip() != "add detail ...",
+    }
+
+
 def _build_projects() -> list:
     """Transform in-memory database into the list-of-dicts the kanban JS expects."""
     if _database is None:
@@ -406,14 +441,9 @@ def _build_projects() -> list:
 
     for sid, task in work_tasks.items():
         details = task_details.get(sid, [])
+        built_details = [_build_detail(d) for d in details]
 
-        # Concatenate all detail notes and render to HTML via markdown2
-        note_parts = []
-        for d in details:
-            note = d.get("note", "")
-            if note:
-                note_parts.append(note)
-        combined_md = "\n\n---\n\n".join(note_parts)
+        issues = sum(1 for bd in built_details if not bd["has_goal"] or not bd["has_what"])
 
         projects.append({
             "id":            sid,
@@ -423,8 +453,9 @@ def _build_projects() -> list:
             "hours_logged":  round(_parse_hours(task.get("twt", "00:00")), 2),
             "hours_planned": 0,
             "last_active":   _last_active(details),
-            "issues":        0,
-            "notes_html":    _render_md(combined_md),
+            "issues":        issues,
+            "type":          task.get("type", "core"),
+            "details":       built_details,
         })
 
     return projects
@@ -437,7 +468,10 @@ def kanban():
     html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "kanban.html")
     with open(html_path, "r", encoding="utf-8") as f:
         template = f.read()
-    return render_template_string(template, projects_json=json.dumps(projects, ensure_ascii=False))
+    # Escape </ sequences so embedded HTML in notes can't break the <script> block
+    raw_json = json.dumps(projects, ensure_ascii=False)
+    safe_json = raw_json.replace("</", "<\\/")
+    return render_template_string(template, projects_json=safe_json)
 
 
 @_flask_app.route("/api/projects/<project_id>/status", methods=["POST"])

@@ -308,12 +308,11 @@ class TaskDetailEditor(tk.LabelFrame):
         and for consistent human reporting.
         """
         return (
-            "## Goal      <!-- definition of done -->\n\n"
-            "## Why       <!-- idea or issue -->\n\n"
-            "## Ticket link\n\n"
-            "## Notes\n\n"
-            "## Surprises <!-- scope changes, blockers, discoveries -->\n\n"
-            ""
+            "## Goal\n\n"           # definition of done
+            "## Why\n\n"            # idea or issue
+            "## Ticket link\n\n"    # redmine ticket
+            "## Notes\n\n"          # details
+            "## Surprises\n\n"      # scope changes, blockers, discoveries
         )
 
     def load_data(self, dict_data):
