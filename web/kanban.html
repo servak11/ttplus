@@ -741,7 +741,8 @@
     <span id="timeline-sub" style="font-size:11px;color:var(--text-3);font-family:var(--mono)"></span>
     <div style="margin-left:auto;display:flex;gap:6px;">
       <button class="btn" id="btn-copy" style="display:none" onclick="copyNoteRaw()">⎘ copy md</button>
-      <button class="btn" id="btn-close-note" style="display:none" onclick="closeNoteView()">✕ close</button>
+      <button class="btn" id="btn-copy-report" style="display:none" onclick="copyReportText()">⎘ copy report</button>
+      <button class="btn" id="btn-close-note" style="display:none" onclick="closePaneView()">✕ close</button>
     </div>
   </div>
   <!-- Timeline view (default) -->
@@ -749,6 +750,10 @@
   <!-- Note view (shown on "notes" click) -->
   <div class="note-view" id="note-view">
     <div class="note-view-body" id="note-view-body"></div>
+  </div>
+  <!-- Report view (shown on "Week Report" click) -->
+  <div class="note-view" id="report-view">
+    <div class="note-view-body" id="report-view-body" style="font-family:var(--mono);font-size:12px;"></div>
   </div>
 </div>
 
@@ -1021,8 +1026,9 @@ function renderTimeline() {
     body.appendChild(row);
   });
 
-  // Only update subtitle if note view is not open
-  if (!document.getElementById('note-view').classList.contains('active')) {
+  // Only update subtitle if note/report view is not open
+  if (!document.getElementById('note-view').classList.contains('active') &&
+      !document.getElementById('report-view').classList.contains('active')) {
     document.getElementById('timeline-sub').textContent = `${totalDetails} tasks across ${visible.length} projects`;
   }
 }
@@ -1041,20 +1047,25 @@ function openNoteView(id, evt) {
   document.getElementById('timeline-title').textContent = `#${p.id} — ${p.title}`;
   document.getElementById('timeline-sub').textContent = `${p.details ? p.details.length : 0} tasks · ${p.hours_logged}h logged`;
 
-  // Switch views
+  // Switch views (close report if open)
+  document.getElementById('report-view').classList.remove('active');
+  document.getElementById('btn-copy-report').style.display = 'none';
   document.getElementById('timeline-body').classList.add('hidden');
   document.getElementById('note-view').classList.add('active');
   document.getElementById('btn-copy').style.display = '';
   document.getElementById('btn-close-note').style.display = '';
 }
 
-function closeNoteView() {
+function closePaneView() {
   document.getElementById('timeline-body').classList.remove('hidden');
   document.getElementById('note-view').classList.remove('active');
+  document.getElementById('report-view').classList.remove('active');
   document.getElementById('btn-copy').style.display = 'none';
+  document.getElementById('btn-copy-report').style.display = 'none';
   document.getElementById('btn-close-note').style.display = 'none';
   document.getElementById('timeline-title').textContent = 'Task Timeline';
   _noteRawCache = '';
+  _reportTextCache = '';
   renderTimeline(); // restore global subtitle
 }
 
@@ -1096,20 +1107,115 @@ function scrollToCol(col) {
   document.getElementById('col-' + col).scrollIntoView({ behavior: 'smooth', inline: 'start' });
 }
 
-function exportWeekReport() {
-  const active = state.projects.filter(p => p.status === 'active' || p.status === 'review');
-  const lines = ['WEEK REPORT — ' + getWeekLabel(), ''];
-  active.forEach(p => {
-    lines.push(`[${p.id}] ${p.title}`);
-    lines.push(`  Hours logged: ${p.hours_logged}h / planned: ${p.hours_planned}h`);
-    lines.push(`  Tasks: ${p.tasks} | Issues: ${p.issues}`);
+let _reportTextCache = '';
+
+function getWeekBounds() {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun, 1=Mon...
+  const diffToMon = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setHours(0, 0, 0, 0);
+  monday.setDate(monday.getDate() + diffToMon);
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  sunday.setHours(23, 59, 59, 999);
+  return { start: monday, end: sunday };
+}
+
+function buildWeekReport() {
+  const bounds = getWeekBounds();
+  const results = []; // {id, title, weekMin, details: [{what, min}]}
+
+  state.projects.forEach(p => {
+    if (!p.details || p.details.length === 0) return;
+    const weekDetails = [];
+    let weekMin = 0;
+
+    p.details.forEach(d => {
+      const dt = new Date(d.start);
+      if (dt >= bounds.start && dt <= bounds.end) {
+        weekDetails.push({ what: d.what || '(no description)', min: d.duration_min });
+        weekMin += d.duration_min;
+      }
+    });
+
+    if (weekDetails.length > 0) {
+      results.push({ id: p.id, title: p.title, weekMin, details: weekDetails });
+    }
+  });
+
+  // Sort by hours descending
+  results.sort((a, b) => b.weekMin - a.weekMin);
+
+  const totalMin = results.reduce((s, r) => s + r.weekMin, 0);
+  const totalH = (totalMin / 60).toFixed(1);
+  const sep = '──────────────────────────────────';
+
+  // Plain text
+  const lines = [`WEEK REPORT — ${getWeekLabel()}`, `Total: ${totalH}h`, sep];
+  results.forEach(r => {
+    const h = (r.weekMin / 60).toFixed(1);
+    const pct = totalMin > 0 ? Math.round((r.weekMin / totalMin) * 100) : 0;
+    lines.push(`[${r.id}] ${r.title}`);
+    lines.push(`  ${pct}%  ·  ${h}h`);
+    r.details.forEach(d => {
+      lines.push(`  - ${d.what} (${d.min}min)`);
+    });
     lines.push('');
   });
-  const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `week-report-${getWeekLabel().replace(' / ','-')}.txt`;
-  a.click();
+  lines.push(sep);
+  const text = lines.join('\n');
+
+  // HTML
+  let html = `<div style="margin-bottom:8px;"><strong>WEEK REPORT — ${getWeekLabel()}</strong><br>Total: <strong>${totalH}h</strong></div>`;
+  html += `<div style="border-top:2px solid var(--border);margin:8px 0;"></div>`;
+
+  if (results.length === 0) {
+    html += '<em style="color:var(--text-3)">No tasks logged this week.</em>';
+  }
+
+  results.forEach(r => {
+    const h = (r.weekMin / 60).toFixed(1);
+    const pct = totalMin > 0 ? Math.round((r.weekMin / totalMin) * 100) : 0;
+    html += `<div style="margin-bottom:10px;">`;
+    html += `<div style="font-weight:600;color:var(--text);">[${r.id}] ${r.title}</div>`;
+    html += `<div style="color:var(--accent);font-size:13px;margin:2px 0;">${pct}%  ·  ${h}h</div>`;
+    r.details.forEach(d => {
+      html += `<div style="color:var(--text-2);padding-left:12px;">- ${d.what} <span style="color:var(--text-3);">(${d.min}min)</span></div>`;
+    });
+    html += `</div>`;
+  });
+
+  html += `<div style="border-top:2px solid var(--border);margin:8px 0;"></div>`;
+
+  return { html, text };
+}
+
+function exportWeekReport() {
+  const report = buildWeekReport();
+  _reportTextCache = report.text;
+
+  document.getElementById('report-view-body').innerHTML = report.html;
+  document.getElementById('timeline-title').textContent = 'Week Report';
+  document.getElementById('timeline-sub').textContent = getWeekLabel();
+
+  // Switch views (close note if open)
+  document.getElementById('note-view').classList.remove('active');
+  document.getElementById('btn-copy').style.display = 'none';
+  document.getElementById('timeline-body').classList.add('hidden');
+  document.getElementById('report-view').classList.add('active');
+  document.getElementById('btn-copy-report').style.display = '';
+  document.getElementById('btn-close-note').style.display = '';
+}
+
+function copyReportText() {
+  if (!_reportTextCache) return;
+  navigator.clipboard.writeText(_reportTextCache).then(() => {
+    const btn = document.getElementById('btn-copy-report');
+    const orig = btn.textContent;
+    btn.textContent = '✓ copied';
+    setTimeout(() => { btn.textContent = orig; }, 1500);
+  });
 }
 
 /* ═══════════════════════════════════════════════
