@@ -540,6 +540,10 @@ class NoteServer:
         self.url     = f"http://127.0.0.1:{port}"
         self._thread = None
         self._started = False
+        self._browser_opened = False
+        self._debounce_timer = None
+        self._pending_note = ""
+        self._pending_meta = None
 
     def set_database(self, db_dict):
         """Share the ttplus in-memory database with Flask routes."""
@@ -573,10 +577,37 @@ class NoteServer:
 
     def show_note(self, note_text: str, meta: dict | None = None):
         """
-        Push note_text to the Flask server and open browser tab.
+        Push note_text to the Flask server immediately.
+        Skips empty notes. Opens browser tab only on first call.
+        Use show_note_debounced() for typing-triggered updates.
         meta keys: project, task, start, end
         """
-        import urllib.request, json
+        # Skip empty / whitespace-only notes
+        if not note_text or not note_text.strip():
+            return
+
+        self._push_note(note_text, meta)
+
+    def show_note_debounced(self, note_text: str, meta: dict | None = None):
+        """
+        Push note after 5s of idle (for typing updates).
+        Each call resets the timer. Skips empty notes.
+        """
+        if not note_text or not note_text.strip():
+            return
+
+        if self._debounce_timer is not None:
+            self._debounce_timer.cancel()
+
+        self._debounce_timer = threading.Timer(
+            5.0, self._push_note, args=(note_text, meta)
+        )
+        self._debounce_timer.daemon = True
+        self._debounce_timer.start()
+
+    def _push_note(self, note_text: str, meta: dict | None = None):
+        """Send the note to the Flask server."""
+        import urllib.request
 
         if not self._started:
             self.start()
@@ -601,8 +632,10 @@ class NoteServer:
             print(f"[mod_flask] POST /note failed: {e}")
             return
 
-        # Open browser on first call; subsequent calls auto-refresh via JS
-        webbrowser.open(self.url)
+        # Open browser only on first call; subsequent updates via JS auto-refresh
+        if not self._browser_opened:
+            webbrowser.open(self.url)
+            self._browser_opened = True
 
     def show_kanban(self):
         """Open the Kanban board in the browser."""
