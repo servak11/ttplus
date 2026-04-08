@@ -38,10 +38,17 @@ _flask_app = Flask(__name__)
 # Reference to ttplus in-memory database (set via set_database())
 _database = None
 
+# Project IDs with pending changes for incremental kanban updates
+_changed_ids = set()
+
 def set_database(db_dict):
     """Store a reference to the ttplus in-memory database dict."""
     global _database
     _database = db_dict
+
+def notify_changed(project_id):
+    """Mark a project as changed so the kanban picks it up on next poll."""
+    _changed_ids.add(project_id)
 
 # Shared state between ttplus thread and Flask thread
 _current_note = {
@@ -493,6 +500,40 @@ def update_project_status(project_id):
     return jsonify({"status": "ok", "id": project_id, "kbs": new_status})
 
 
+@_flask_app.route("/api/updates")
+def get_updates():
+    """Return only changed projects since last poll, then clear the set."""
+    if not _changed_ids or _database is None:
+        return jsonify([])
+
+    work_tasks = _database.get("work_tasks", {})
+    task_details = _database.get("task_details", {})
+    results = []
+
+    for sid in list(_changed_ids):
+        task = work_tasks.get(sid)
+        if not task:
+            continue
+        details = task_details.get(sid, [])
+        built_details = [_build_detail(d) for d in details]
+        issues = sum(1 for bd in built_details if not bd["has_goal"] or not bd["has_what"])
+        results.append({
+            "id":            sid,
+            "title":         task.get("tnm", ""),
+            "status":        task.get("kbs", "backlog"),
+            "tasks":         len(details),
+            "hours_logged":  round(_parse_hours(task.get("twt", "00:00")), 2),
+            "hours_planned": 0,
+            "last_active":   _last_active(details),
+            "issues":        issues,
+            "type":          task.get("type", "core"),
+            "details":       built_details,
+        })
+
+    _changed_ids.clear()
+    return jsonify(results)
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _render_md(text: str) -> str:
@@ -548,6 +589,10 @@ class NoteServer:
     def set_database(self, db_dict):
         """Share the ttplus in-memory database with Flask routes."""
         set_database(db_dict)
+
+    def notify_changed(self, project_id):
+        """Mark a project as changed for incremental kanban updates."""
+        notify_changed(project_id)
 
     def start(self):
         """Start Flask in a daemon thread (safe to call multiple times)."""

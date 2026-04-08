@@ -153,10 +153,17 @@ from util.ts import *
 from controls.statusbar import StatusBar
 from controls.tasktable import TableWidget
 
+import time as _time
+
 from web.flask_server import NoteServer
 
 note_server = NoteServer()
 note_server.start()
+
+# ── Conditional DB save state ─────────────────────────────────────────────────
+_note_dirty = False
+_last_save_time = _time.time()
+SAVE_INTERVAL = 300  # 5 minutes
 
 # Task 1
 ## Design the Time Tracker
@@ -171,7 +178,6 @@ root.geometry("800x700+500+75")
 
 
 def on_close():
-    print("db.save_data(database)")
     db.save_data(database)
     root.quit()
     root.destroy()  # Destroy the Tkinter window
@@ -457,6 +463,10 @@ def update_task_details(d_new_details):
     # it seems easier just to update all values in the tablle
     table2.item(selected_item, values=l, tags=("blue",))
 
+    # Mark note as changed for conditional save
+    global _note_dirty
+    _note_dirty = True
+
 # Delete the selected task from Table 1 and the database
 def delete_task():
     selected_item = table1.selection()
@@ -585,6 +595,19 @@ def on_table2_select(event):
     Returns:
         None
     """
+    # ── Conditional save: if note was edited and 5min cooldown passed ──
+    global _note_dirty, _last_save_time
+    if _note_dirty and (_time.time() - _last_save_time >= SAVE_INTERVAL):
+        try:
+            prev_task_id = table1.item(table1.selection(), "values")[0]
+            db.save_data(database)
+            _last_save_time = _time.time()
+            note_server.notify_changed(prev_task_id)
+            status_bar.s_set("DB saved, kanban notified")
+        except Exception:
+            pass
+        _note_dirty = False
+
     # check if selection was done
     selected_detail = table2.selection()
     if not selected_detail:

@@ -1152,7 +1152,10 @@ function buildWeekReport() {
   const sep = '──────────────────────────────────';
 
   // Plain text
-  const lines = [`WEEK REPORT — ${getWeekLabel()}`, `Total: ${totalH}h`, sep];
+  const lines = [
+    //`WEEK REPORT — ${getWeekLabel()}`,
+    `Total: ${totalH}h`, 
+    sep];
   results.forEach(r => {
     const h = (r.weekMin / 60).toFixed(1);
     const pct = totalMin > 0 ? Math.round((r.weekMin / totalMin) * 100) : 0;
@@ -1225,6 +1228,29 @@ document.getElementById('search').addEventListener('input', e => {
   state.search = e.target.value.trim();
   renderBoard();
 });
+
+/* ═══════════════════════════════════════════════
+   LIVE UPDATES — light poll for incremental changes
+   ═══════════════════════════════════════════════ */
+function checkUpdates() {
+  fetch('/api/updates')
+    .then(r => r.json())
+    .then(updates => {
+      if (!updates || updates.length === 0) return;
+      updates.forEach(u => {
+        const idx = state.projects.findIndex(p => p.id === u.id);
+        if (idx >= 0) {
+          state.projects[idx] = u;
+        } else {
+          state.projects.push(u);
+        }
+      });
+      renderBoard();
+    })
+    .catch(() => {}); // silent on network errors
+}
+
+setInterval(checkUpdates, 10000);
 
 /* ═══════════════════════════════════════════════
    INIT
