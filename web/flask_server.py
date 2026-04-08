@@ -25,12 +25,22 @@ Usage in ttplus.py:
 import threading
 import webbrowser
 import markdown2
-from flask import Flask, request, jsonify, render_template_string
+import json
+import os
+from flask import Flask, request, jsonify, render_template_string, send_file
 from datetime import datetime
 
 # ── Flask app ──────────────────────────────────────────────────────────────────
 
 _flask_app = Flask(__name__)
+
+# Reference to ttplus in-memory database (set via set_database())
+_database = None
+
+def set_database(db_dict):
+    """Store a reference to the ttplus in-memory database dict."""
+    global _database
+    _database = db_dict
 
 # Shared state between ttplus thread and Flask thread
 _current_note = {
@@ -363,6 +373,92 @@ def raw_note():
     return Response(_current_note["raw"], mimetype="text/plain; charset=utf-8")
 
 
+# ── Kanban routes ─────────────────────────────────────────────────────────────
+
+def _parse_hours(twt: str) -> float:
+    """Convert 'HH:MM' string to decimal hours."""
+    try:
+        parts = twt.split(":")
+        return int(parts[0]) + int(parts[1]) / 60.0
+    except Exception:
+        return 0.0
+
+
+def _last_active(details: list) -> str:
+    """Return the latest End Time from a detail list as 'YYYY-MM-DD'."""
+    latest = ""
+    for d in details:
+        et = d.get("End Time", "")
+        if et > latest:
+            latest = et
+    if len(latest) >= 8:
+        return f"{latest[0:4]}-{latest[4:6]}-{latest[6:8]}"
+    return ""
+
+
+def _build_projects() -> list:
+    """Transform in-memory database into the list-of-dicts the kanban JS expects."""
+    if _database is None:
+        return []
+    work_tasks = _database.get("work_tasks", {})
+    task_details = _database.get("task_details", {})
+    projects = []
+
+    for sid, task in work_tasks.items():
+        details = task_details.get(sid, [])
+
+        # Concatenate all detail notes and render to HTML via markdown2
+        note_parts = []
+        for d in details:
+            note = d.get("note", "")
+            if note:
+                note_parts.append(note)
+        combined_md = "\n\n---\n\n".join(note_parts)
+
+        projects.append({
+            "id":            sid,
+            "title":         task.get("tnm", ""),
+            "status":        task.get("kbs", "backlog"),
+            "tasks":         len(details),
+            "hours_logged":  round(_parse_hours(task.get("twt", "00:00")), 2),
+            "hours_planned": 0,
+            "last_active":   _last_active(details),
+            "issues":        0,
+            "notes_html":    _render_md(combined_md),
+        })
+
+    return projects
+
+
+@_flask_app.route("/kanban")
+def kanban():
+    """Serve kanban.html with live project data from tasks.json."""
+    projects = _build_projects()
+    html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "kanban.html")
+    with open(html_path, "r", encoding="utf-8") as f:
+        template = f.read()
+    return render_template_string(template, projects_json=json.dumps(projects, ensure_ascii=False))
+
+
+@_flask_app.route("/api/projects/<project_id>/status", methods=["POST"])
+def update_project_status(project_id):
+    """Update kanban column status in the in-memory database (RAM only)."""
+    data = request.get_json(force=True)
+    new_status = data.get("status", "")
+    if new_status not in ("backlog", "active", "review", "done"):
+        return jsonify({"error": "invalid status"}), 400
+
+    if _database is None:
+        return jsonify({"error": "database not initialized"}), 500
+
+    task = _database.get("work_tasks", {}).get(project_id)
+    if not task:
+        return jsonify({"error": "project not found"}), 404
+
+    task["kbs"] = new_status
+    return jsonify({"status": "ok", "id": project_id, "kbs": new_status})
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _render_md(text: str) -> str:
@@ -410,6 +506,10 @@ class NoteServer:
         self.url     = f"http://127.0.0.1:{port}"
         self._thread = None
         self._started = False
+
+    def set_database(self, db_dict):
+        """Share the ttplus in-memory database with Flask routes."""
+        set_database(db_dict)
 
     def start(self):
         """Start Flask in a daemon thread (safe to call multiple times)."""
@@ -469,6 +569,12 @@ class NoteServer:
 
         # Open browser on first call; subsequent calls auto-refresh via JS
         webbrowser.open(self.url)
+
+    def show_kanban(self):
+        """Open the Kanban board in the browser."""
+        if not self._started:
+            self.start()
+        webbrowser.open(f"{self.url}/kanban")
 
 
 # ── Standalone test ───────────────────────────────────────────────────────────

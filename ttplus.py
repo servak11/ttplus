@@ -697,6 +697,9 @@ def show_report():
 
 note_shown = False
 
+def show_kanban():
+    note_server.show_kanban()   # opens http://127.0.0.1:5000/kanban
+
 def push_note_to_browser():
     """Push the currently selected task detail note to the Flask viewer."""
     try:
@@ -706,7 +709,7 @@ def push_note_to_browser():
         task_name = ""
 
     global note_shown
-    if not note_shown:
+    if not note_shown or 1:
         note_shown = True # do not start the server again if it was already started
         note_server.show_note(
             note_text = tde.get_note(),
@@ -763,6 +766,7 @@ def show_task_report():
 
 db = Database()
 database = db.load_data()
+note_server.set_database(database)
 
 #settings = Database("settings.json").load_data()
 
@@ -787,6 +791,7 @@ menu_bar.add_command(label="Detail Effort Report", command=show_task_report)
 menu_bar.add_command(label="Test", command=tt_test_action)
 #menu_bar.add_command(label="TW", command=tw_report)
 menu_bar.add_command(label="View Note in Browser", command=push_note_to_browser)
+menu_bar.add_command(label="Show Kanban", command=show_kanban)
 
 # Table 1 (Work Tasks)
 frame1 = ttk.LabelFrame(root, text="Work Tasks")

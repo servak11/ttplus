@@ -489,6 +489,12 @@
     line-height: 1.6;
     color: var(--text-2);
   }
+  .task-pane-body h1 { font-size: 14px; font-weight: 600; margin: 10px 0 4px; color: var(--text); }
+  .task-pane-body h2 { font-size: 13px; font-weight: 600; margin: 8px 0 4px; color: var(--accent); }
+  .task-pane-body h3 { font-size: 12px; font-weight: 500; margin: 6px 0 3px; color: var(--text-2); }
+  .task-pane-body hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+  .task-pane-body pre { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 8px; font-size: 11px; overflow-x: auto; }
+  .task-pane-body code { font-family: var(--mono); font-size: 11px; }
 
   /* ── FILTER BAR ── */
   .filter-bar {
@@ -658,123 +664,10 @@
 
 <script>
 /* ═══════════════════════════════════════════════
-   DATA MODEL
-   In production: replace PROJECTS with data from
-   Flask: const PROJECTS = {{ projects | tojson }};
+   DATA MODEL — injected by Flask from tasks.json
    ═══════════════════════════════════════════════ */
 
-const PROJECTS = [
-  {
-    id: "17742",
-    title: "Add Kanban Automation",
-    status: "active",
-    tasks: 10,
-    hours_logged: 14.5,
-    hours_planned: 20,
-    last_active: "2025-06-12",
-    issues: 1,
-    notes: "## Add Kanban Automation\n\nBuilding project-centric Kanban board with SortableJS.\n\n**ADR-01** through **ADR-08** defined and approved.\n\n### Open issues\n- Missing end times on 2 tasks (defaulting to start time)\n- Notes field inconsistent across older tasks"
-  },
-  {
-    id: "CR-W24",
-    title: "Code Reviews (persistent)",
-    status: "active",
-    tasks: 23,
-    hours_logged: 6.0,
-    hours_planned: 8,
-    last_active: "2025-06-13",
-    issues: 0,
-    notes: "## Code Reviews\n\nWeekly persistent activity. Includes PR reviews across all active teams.\n\n- W24: 6 PRs reviewed\n- Focus: API gateway changes, auth layer refactor"
-  },
-  {
-    id: "15891",
-    title: "API Gateway Refactor",
-    status: "review",
-    tasks: 8,
-    hours_logged: 18.0,
-    hours_planned: 16,
-    last_active: "2025-06-10",
-    issues: 0,
-    notes: "## API Gateway Refactor\n\nMigrated legacy gateway to new service mesh.\n\n**Status**: Implementation complete, awaiting sign-off.\n\nReport draft pending — need to log final 2h of integration testing."
-  },
-  {
-    id: "16230",
-    title: "Auth Layer — MFA Integration",
-    status: "active",
-    tasks: 5,
-    hours_logged: 7.5,
-    hours_planned: 12,
-    last_active: "2025-06-11",
-    issues: 2,
-    notes: "## MFA Integration\n\nAdding TOTP + hardware key support.\n\n### Issues\n- 2 tasks missing end times\n- Goal field empty on task #3"
-  },
-  {
-    id: "15002",
-    title: "DB Migration — Postgres 16",
-    status: "done",
-    tasks: 12,
-    hours_logged: 22.0,
-    hours_planned: 20,
-    last_active: "2025-06-01",
-    issues: 0,
-    notes: "## Postgres 16 Migration\n\nCompleted migration for all production schemas.\n\nFinal report submitted to project tracker."
-  },
-  {
-    id: "16780",
-    title: "CI Pipeline Hardening",
-    status: "backlog",
-    tasks: 3,
-    hours_logged: 0,
-    hours_planned: 10,
-    last_active: "2025-05-20",
-    issues: 0,
-    notes: "## CI Pipeline Hardening\n\nPlanned for next sprint. Key tasks:\n- Add SAST scanning\n- Parallelize test matrix\n- Cache layer optimisation"
-  },
-  {
-    id: "14450",
-    title: "Frontend Design System",
-    status: "backlog",
-    tasks: 6,
-    hours_logged: 2.0,
-    hours_planned: 24,
-    last_active: "2025-04-15",
-    issues: 1,
-    notes: "## Design System\n\nBacklogged — deprioritised after Q1 reshuffle."
-  },
-  {
-    id: "16901",
-    title: "Observability Stack — OTel",
-    status: "active",
-    tasks: 7,
-    hours_logged: 9.0,
-    hours_planned: 14,
-    last_active: "2025-06-12",
-    issues: 0,
-    notes: "## OpenTelemetry Integration\n\nInstrumenting backend services with OTel SDK.\n\nNext: add trace sampling config."
-  },
-  {
-    id: "17100",
-    title: "Security Audit — Q2",
-    status: "review",
-    tasks: 4,
-    hours_logged: 11.0,
-    hours_planned: 12,
-    last_active: "2025-06-08",
-    issues: 0,
-    notes: "## Q2 Security Audit\n\nFull pen-test completed. 3 medium findings, 0 critical.\n\nWaiting on remediations sign-off from CTO."
-  },
-  {
-    id: "17340",
-    title: "Docs Overhaul — API Reference",
-    status: "backlog",
-    tasks: 2,
-    hours_logged: 0,
-    hours_planned: 8,
-    last_active: "2025-05-30",
-    issues: 0,
-    notes: "## API Reference Docs\n\nNo tasks started. Tentatively assigned next cycle."
-  }
-];
+const PROJECTS = {{ projects_json | safe }};
 
 /* ═══════════════════════════════════════════════
    STATE
@@ -797,9 +690,16 @@ function getWeekLabel() {
 
 function simpleMarkdown(md) {
   if (!md) return '<em style="color:var(--text-3)">No notes.</em>';
-  return md
+  // Escape HTML first to prevent raw HTML/scripts from rendering
+  let s = md
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  // Then apply markdown conversions on the safe text
+  return s
     .replace(/^## (.+)$/gm, '<h3 style="font-size:14px;font-weight:600;margin:8px 0 4px;color:var(--text)">$1</h3>')
     .replace(/^### (.+)$/gm, '<h4 style="font-size:13px;font-weight:500;margin:6px 0 3px;color:var(--text)">$1</h4>')
+    .replace(/`([^`]+)`/g, '<code style="background:var(--bg);padding:1px 4px;border-radius:3px;font-size:12px">$1</code>')
     .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.+?)\*/g, '<em>$1</em>')
     .replace(/^- (.+)$/gm, '<li style="margin-left:16px;margin-bottom:2px">$1</li>')
@@ -961,7 +861,11 @@ function initSortable() {
         const proj = state.projects.find(p => p.id === id);
         if (proj && proj.status !== newStatus) {
           proj.status = newStatus;
-          // In production: POST /api/projects/{id}/status  { status: newStatus }
+          fetch(`/api/projects/${id}/status`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({status: newStatus})
+          }).catch(err => console.error('[kanban] status save failed:', err));
           console.log(`[kanban] ${id} → ${newStatus}`);
           renderBoard();
         }
@@ -983,7 +887,7 @@ function openPane(id, evt) {
   if (!p) return;
   document.getElementById('pane-title').textContent = `#${p.id} — ${p.title}`;
   document.getElementById('pane-sub').textContent = `${p.tasks} tasks · ${p.hours_logged}h logged`;
-  document.getElementById('pane-body').innerHTML = simpleMarkdown(p.notes);
+  document.getElementById('pane-body').innerHTML = p.notes_html || '<em>No notes.</em>';
   document.getElementById('task-pane').classList.add('open');
 }
 
@@ -997,7 +901,15 @@ function closePane() {
 function markDone(id, evt) {
   if (evt) evt.stopPropagation();
   const p = state.projects.find(x => x.id === id);
-  if (p) { p.status = 'done'; renderBoard(); }
+  if (p) {
+    p.status = 'done';
+    fetch(`/api/projects/${id}/status`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({status: 'done'})
+    }).catch(err => console.error('[kanban] status save failed:', err));
+    renderBoard();
+  }
 }
 
 function setFilter(f, btn) {

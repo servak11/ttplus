@@ -1,0 +1,236 @@
+<svg width="100%" viewBox="0 0 680 860" xmlns="http://www.w3.org/2000/svg">
+<style>
+  text { font-family: sans-serif; }
+  .th { font-size: 14px; font-weight: 500; fill: #1a1814; }
+  .ts { font-size: 12px; font-weight: 400; fill: #6b6560; }
+
+  /* c-gray */
+  g.c-gray > rect, rect.c-gray { fill: #F1EFE8; stroke: #5F5E5A; }
+  g.c-gray > text.th { fill: #444441; }
+  g.c-gray > text.ts { fill: #5F5E5A; }
+
+  /* c-teal */
+  g.c-teal > rect, rect.c-teal { fill: #E1F5EE; stroke: #0F6E56; }
+  g.c-teal > text.th { fill: #085041; }
+  g.c-teal > text.ts { fill: #0F6E56; }
+
+  /* c-purple */
+  g.c-purple > rect, rect.c-purple { fill: #EEEDFE; stroke: #534AB7; }
+  g.c-purple > text.th { fill: #3C3489; }
+  g.c-purple > text.ts { fill: #534AB7; }
+
+  /* c-amber */
+  g.c-amber > rect, rect.c-amber { fill: #FAEEDA; stroke: #854F0B; }
+  g.c-amber > text.th { fill: #633806; }
+  g.c-amber > text.ts { fill: #854F0B; }
+
+  /* c-coral */
+  g.c-coral > rect, rect.c-coral { fill: #FAECE7; stroke: #993C1D; }
+  g.c-coral > text.th { fill: #712B13; }
+  g.c-coral > text.ts { fill: #993C1D; }
+</style>
+
+<!-- ── CURRENT (left) ── -->
+<g class="c-gray">
+  <rect x="30" y="30" width="270" height="630" rx="14" stroke-width="0.5"/>
+  <text class="th" x="165" y="56" text-anchor="middle" dominant-baseline="central">current — flat root</text>
+</g>
+
+<g class="c-gray">
+  <rect x="50" y="72" width="230" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="165" y="85" text-anchor="middle" dominant-baseline="central">ttplus.py</text>
+  <text class="ts" x="165" y="99" text-anchor="middle" dominant-baseline="central">main — 700+ lines, all mixed</text>
+</g>
+<g class="c-gray">
+  <rect x="50" y="116" width="230" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="165" y="129" text-anchor="middle" dominant-baseline="central">mod_db.py</text>
+  <text class="ts" x="165" y="143" text-anchor="middle" dominant-baseline="central">JSON load/save</text>
+</g>
+<g class="c-gray">
+  <rect x="50" y="160" width="230" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="165" y="173" text-anchor="middle" dominant-baseline="central">mod_detaileditor.py</text>
+  <text class="ts" x="165" y="187" text-anchor="middle" dominant-baseline="central">Tkinter detail editor</text>
+</g>
+<g class="c-gray">
+  <rect x="50" y="204" width="230" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="165" y="217" text-anchor="middle" dominant-baseline="central">mod_table.py</text>
+  <text class="ts" x="165" y="231" text-anchor="middle" dominant-baseline="central">TreeView widget</text>
+</g>
+<g class="c-gray">
+  <rect x="50" y="248" width="230" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="165" y="261" text-anchor="middle" dominant-baseline="central">mod_statusbar.py</text>
+  <text class="ts" x="165" y="275" text-anchor="middle" dominant-baseline="central">status bar widget</text>
+</g>
+<g class="c-amber">
+  <rect x="50" y="292" width="230" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="165" y="305" text-anchor="middle" dominant-baseline="central">mod_flask.py</text>
+  <text class="ts" x="165" y="319" text-anchor="middle" dominant-baseline="central">Flask note server</text>
+</g>
+<g class="c-amber">
+  <rect x="50" y="336" width="230" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="165" y="349" text-anchor="middle" dominant-baseline="central">mod_browser.py</text>
+  <text class="ts" x="165" y="363" text-anchor="middle" dominant-baseline="central">browser launcher</text>
+</g>
+<g class="c-amber">
+  <rect x="50" y="380" width="230" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="165" y="393" text-anchor="middle" dominant-baseline="central">mod_buchen.py</text>
+  <text class="ts" x="165" y="407" text-anchor="middle" dominant-baseline="central">booking / export</text>
+</g>
+<g class="c-amber">
+  <rect x="50" y="424" width="230" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="165" y="437" text-anchor="middle" dominant-baseline="central">mod_timetrack.py</text>
+  <text class="ts" x="165" y="451" text-anchor="middle" dominant-baseline="central">time tracking logic</text>
+</g>
+<g class="c-amber">
+  <rect x="50" y="468" width="230" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="165" y="481" text-anchor="middle" dominant-baseline="central">mod_tt_bridge.py</text>
+  <text class="ts" x="165" y="495" text-anchor="middle" dominant-baseline="central">unclear purpose</text>
+</g>
+<g class="c-gray">
+  <rect x="50" y="512" width="110" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="105" y="525" text-anchor="middle" dominant-baseline="central">controls/</text>
+  <text class="ts" x="105" y="539" text-anchor="middle" dominant-baseline="central">timespin, date…</text>
+</g>
+<g class="c-gray">
+  <rect x="170" y="512" width="110" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="225" y="525" text-anchor="middle" dominant-baseline="central">util/</text>
+  <text class="ts" x="225" y="539" text-anchor="middle" dominant-baseline="central">ts.py timestamps</text>
+</g>
+<g class="c-coral">
+  <rect x="50" y="556" width="230" height="46" rx="4" stroke-width="0.5"/>
+  <text class="th" x="165" y="569" text-anchor="middle" dominant-baseline="central">tblabfrage.js</text>
+  <text class="ts" x="165" y="583" text-anchor="middle" dominant-baseline="central">
+  Show summary table
+  </text>
+  <text class="ts" x="165" y="595" text-anchor="middle" dominant-baseline="central">
+  below the Kommen/Gehen table
+  </text>
+</g>
+<g class="c-gray">
+  <rect x="50" y="614" width="110" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="105" y="627" text-anchor="middle" dominant-baseline="central">config.py</text>
+  <text class="ts" x="105" y="641" text-anchor="middle" dominant-baseline="central">settings</text>
+</g>
+<g class="c-gray">
+  <rect x="170" y="614" width="110" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="225" y="627" text-anchor="middle" dominant-baseline="central">const.py</text>
+  <text class="ts" x="225" y="641" text-anchor="middle" dominant-baseline="central">constants</text>
+</g>
+
+<!-- ── PROPOSED (right) ── -->
+<g class="c-gray">
+  <rect x="370" y="30" width="280" height="810" rx="14" stroke-width="0.5"/>
+  <text class="th" x="510" y="56" text-anchor="middle" dominant-baseline="central">proposed — packages</text>
+</g>
+
+<g class="c-teal">
+  <rect x="390" y="72" width="240" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="510" y="85" text-anchor="middle" dominant-baseline="central">ttplus.py</text>
+  <text class="ts" x="510" y="99" text-anchor="middle" dominant-baseline="central">entry point only, ~80 lines</text>
+</g>
+
+<!-- core/ -->
+<g class="c-gray">
+  <rect x="390" y="122" width="240" height="156" rx="8" stroke-width="0.5"/>
+  <text class="th" x="510" y="141" text-anchor="middle" dominant-baseline="central">core/</text>
+  <text class="ts" x="510" y="155" text-anchor="middle" dominant-baseline="central">data + timer logic</text>
+</g>
+<g class="c-gray">
+  <rect x="404" y="162" width="212" height="28" rx="4" stroke-width="0.5"/>
+  <text class="ts" x="510" y="180" text-anchor="middle" dominant-baseline="central">db.py  (mod_db)</text>
+</g>
+<g class="c-gray">
+  <rect x="404" y="196" width="212" height="28" rx="4" stroke-width="0.5"/>
+  <text class="ts" x="510" y="214" text-anchor="middle" dominant-baseline="central">timer.py  (heartbeat + clock)</text>
+</g>
+<g class="c-gray">
+  <rect x="404" y="230" width="212" height="28" rx="4" stroke-width="0.5"/>
+  <text class="ts" x="510" y="248" text-anchor="middle" dominant-baseline="central">timetrack.py  (mod_timetrack)</text>
+</g>
+
+<!-- ui/ -->
+<g class="c-purple">
+  <rect x="390" y="292" width="240" height="196" rx="8" stroke-width="0.5"/>
+  <text class="th" x="510" y="311" text-anchor="middle" dominant-baseline="central">ui/</text>
+  <text class="ts" x="510" y="325" text-anchor="middle" dominant-baseline="central">all Tkinter widgets</text>
+</g>
+<g class="c-purple">
+  <rect x="404" y="332" width="212" height="28" rx="4" stroke-width="0.5"/>
+  <text class="ts" x="510" y="350" text-anchor="middle" dominant-baseline="central">detaileditor.py</text>
+</g>
+<g class="c-purple">
+  <rect x="404" y="366" width="212" height="28" rx="4" stroke-width="0.5"/>
+  <text class="ts" x="510" y="384" text-anchor="middle" dominant-baseline="central">table.py</text>
+</g>
+<g class="c-purple">
+  <rect x="404" y="400" width="212" height="28" rx="4" stroke-width="0.5"/>
+  <text class="ts" x="510" y="418" text-anchor="middle" dominant-baseline="central">statusbar.py</text>
+</g>
+<g class="c-purple">
+  <rect x="404" y="434" width="212" height="28" rx="4" stroke-width="0.5"/>
+  <text class="ts" x="510" y="452" text-anchor="middle" dominant-baseline="central">controls/  (timespin, date…)</text>
+</g>
+
+<!-- web/ -->
+<g class="c-amber">
+  <rect x="390" y="502" width="240" height="162" rx="8" stroke-width="0.5"/>
+  <text class="th" x="510" y="521" text-anchor="middle" dominant-baseline="central">web/</text>
+  <text class="ts" x="510" y="535" text-anchor="middle" dominant-baseline="central">Flask + browser layer</text>
+</g>
+<g class="c-amber">
+  <rect x="404" y="542" width="212" height="28" rx="4" stroke-width="0.5"/>
+  <text class="ts" x="510" y="560" text-anchor="middle" dominant-baseline="central">flask_server.py  (mod_flask)</text>
+</g>
+<g class="c-amber">
+  <rect x="404" y="576" width="212" height="28" rx="4" stroke-width="0.5"/>
+  <text class="ts" x="510" y="594" text-anchor="middle" dominant-baseline="central">note_renderer.py</text>
+</g>
+<g class="c-amber">
+  <rect x="404" y="610" width="212" height="28" rx="4" stroke-width="0.5"/>
+  <text class="ts" x="510" y="628" text-anchor="middle" dominant-baseline="central">static/  (kanban.html, .js)</text>
+</g>
+<g class="c-amber">
+  <rect x="404" y="644" width="212" height="28" rx="4" stroke-width="0.5"/>
+  <text class="ts" x="510" y="662" text-anchor="middle" dominant-baseline="central">tblabfrage.js  → here</text>
+</g>
+
+<!-- reporting/ -->
+<g class="c-teal">
+  <rect x="390" y="678" width="240" height="96" rx="8" stroke-width="0.5"/>
+  <text class="th" x="510" y="697" text-anchor="middle" dominant-baseline="central">reporting/</text>
+  <text class="ts" x="510" y="711" text-anchor="middle" dominant-baseline="central">export + booking</text>
+</g>
+<g class="c-teal">
+  <rect x="404" y="718" width="212" height="28" rx="4" stroke-width="0.5"/>
+  <text class="ts" x="510" y="736" text-anchor="middle" dominant-baseline="central">buchen.py  (mod_buchen)</text>
+</g>
+<g class="c-teal">
+  <rect x="404" y="752" width="212" height="28" rx="4" stroke-width="0.5"/>
+  <text class="ts" x="510" y="770" text-anchor="middle" dominant-baseline="central">week_report.py  (new)</text>
+</g>
+
+<!-- config / util -->
+<g class="c-gray">
+  <rect x="390" y="788" width="115" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="447" y="801" text-anchor="middle" dominant-baseline="central">config.py</text>
+  <text class="ts" x="447" y="815" text-anchor="middle" dominant-baseline="central">stays at root</text>
+</g>
+<g class="c-gray">
+  <rect x="515" y="788" width="115" height="36" rx="4" stroke-width="0.5"/>
+  <text class="th" x="572" y="801" text-anchor="middle" dominant-baseline="central">util/</text>
+  <text class="ts" x="572" y="815" text-anchor="middle" dominant-baseline="central">stays at root</text>
+</g>
+
+<!-- ── LEGEND ── -->
+<rect x="30" y="660" width="10" height="10" rx="2" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text class="ts" x="46" y="670">entry / config</text>
+<rect x="30" y="678" width="10" height="10" rx="2" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text class="ts" x="46" y="688">Tkinter UI</text>
+<rect x="30" y="696" width="10" height="10" rx="2" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+<text class="ts" x="46" y="706">web / Flask</text>
+<rect x="30" y="714" width="10" height="10" rx="2" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text class="ts" x="46" y="724">data / core</text>
+<rect x="30" y="732" width="10" height="10" rx="2" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+<text class="ts" x="46" y="742">needs attention</text>
+
+</svg>
