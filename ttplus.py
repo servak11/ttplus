@@ -561,7 +561,9 @@ def calculate_total_work_time(task_id):
             tss = get_dt(detail["Start Time"])
             tse = get_dt(detail["End Time"])
             delta = tse - tss
-            total_minutes += delta.seconds // 60
+            mins = int(delta.total_seconds()) // 60
+            if mins > 0:
+                total_minutes += mins
         except Exception:
             pass  # skip details with missing or malformed times
 
