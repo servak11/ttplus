@@ -534,6 +534,31 @@ def get_updates():
     return jsonify(results)
 
 
+# select:
+#
+# When you click a project card in the Kanban,
+# the browser POSTs the ID to Flask. Flask calls
+# a callback that was registered by ttplus.py.
+# ttplus then calls select_task_by_id()
+# — which already exists in the code.
+#
+# at module level — callback registered by ttplus
+_select_callback = None
+
+def register_select_callback(fn):
+    global _select_callback
+    _select_callback = fn
+
+@_flask_app.route("/api/select", methods=["POST"])
+def select_task():
+    data = request.get_json(force=True)
+    task_id = data.get("id", "")
+    if _select_callback and task_id:
+        # schedule on the Tkinter main thread — never call Tkinter from a Flask thread
+        _select_callback(task_id)
+    return jsonify({"status": "ok", "id": task_id})
+
+
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
 def _render_md(text: str) -> str:
@@ -593,6 +618,9 @@ class NoteServer:
     def notify_changed(self, project_id):
         """Mark a project as changed for incremental kanban updates."""
         notify_changed(project_id)
+
+    def register_select_callback(self, fn):
+        register_select_callback(fn)
 
     def start(self):
         """Start Flask in a daemon thread (safe to call multiple times)."""

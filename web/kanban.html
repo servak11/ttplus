@@ -832,7 +832,17 @@ function getVisible() {
   }
   return projs;
 }
-
+async function selectInPython(id) {
+    try {
+        await fetch('/api/select', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id })
+        });
+    } catch (e) {
+        console.warn('selectInPython failed:', e);
+    }
+}
 /* ═══════════════════════════════════════════════
    RENDER
    ═══════════════════════════════════════════════ */
@@ -860,6 +870,7 @@ function renderCard(p) {
       <button class="card-btn" onclick="markDone('${p.id}', event)">→ done</button>
     </div>
   `;
+  card.onclick = () => selectInPython(p.id);
   return card;
 }
 

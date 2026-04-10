@@ -719,6 +719,22 @@ def show_report():
     # sort list
     print("\n".join(sorted(report_list)))
 
+def on_kanban_select(task_id):
+    # The critical detail: Flask runs in a background thread,
+    # Tkinter is not thread-safe. You must use root.after()
+    # to schedule the selection back onto the Tkinter main loop.
+    # root.after() safely bridges Flask thread → Tkinter thread
+    root.after(0, lambda: _select_and_scroll(task_id))
+
+def _select_and_scroll(task_id):
+    select_task_by_id(task_id)
+    # scroll table1 so selected row is visible
+    selected = table1.selection()
+    if selected:
+        # Tkinter TreeView built-in — jumps to row
+        table1.see(selected[0])
+
+note_server.register_select_callback(on_kanban_select)
 
 note_shown = False
 
