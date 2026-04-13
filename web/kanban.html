@@ -1183,11 +1183,31 @@ function buildWeekReport(offset = 0) {
   const sep = '──────────────────────────────────';
   const sep21 = '════════════════════════════════';
   const sep2 = '╞══════════════════════════════════╡';
+  // Build summary rows (extract #nnnnn ticket from title if present)
+  const summary = results.map(r => {
+    const pct = totalMin > 0 ? Math.round((r.weekMin / totalMin) * 100) : 0;
+    const m = r.title.match(/#(\d+)/);
+    const ticket = m ? `#${m[1]}` : '';
+    const cleanTitle = r.title.replace(/#\d+\s*:?\s*/, '').trim();
+    return { pct, ticket, title: cleanTitle };
+  });
+  // Align "<pct>% <ticket>:" left part to a fixed width
+  const leftParts = summary.map(s =>
+    `${s.pct}%${s.ticket ? ' ' + s.ticket : ''}:`
+  );
+  const leftMax = leftParts.reduce((m, s) => Math.max(m, s.length), 0);
+
   // Plain text
   const lines = [sep_s,
     `┆ WEEK REPORT — ${weekLabel}`,
     `┆ Total: ${totalH}h`,
+    `┆`,
   ];
+  summary.forEach((s, i) => {
+    const left = leftParts[i].padEnd(leftMax + 2, ' ');
+    lines.push(`┆   - ${left}${s.title}`);
+  });
+  lines.push(`┆`);
   results.forEach(r => {
     const h = (r.weekMin / 60).toFixed(1);
     const pct = totalMin > 0 ? Math.round((r.weekMin / totalMin) * 100) : 0;
@@ -1207,6 +1227,17 @@ function buildWeekReport(offset = 0) {
 
   if (results.length === 0) {
     html += '<em style="color:var(--text-3)">No tasks logged this week.</em>';
+  }
+
+  // Summary block (monospace for alignment)
+  if (summary.length > 0) {
+    html += `<pre style="font-family:var(--mono);font-size:12px;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;margin:6px 0 12px;line-height:1.5;">`;
+    summary.forEach((s, i) => {
+      const left = leftParts[i].padEnd(leftMax + 2, ' ');
+      const escapedTitle = s.title.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      html += `  - ${left}${escapedTitle}\n`;
+    });
+    html += `</pre>`;
   }
 
   results.forEach(r => {
