@@ -1,0 +1,303 @@
+import os
+from datetime import datetime
+import tkinter as tk
+from tkinter import ttk
+from tkinter import messagebox
+
+from config import APP_TITLE, THEMES
+from mod_db import Database
+
+from util.ts import get_ts
+
+from project import ProjectManagerScreen
+
+from controls.statusbar import StatusBar
+from controls.tasktable import TableWidget
+from mod_detaileditor import TaskDetailEditor
+
+from control import TTPlusController
+
+class TTPlusScreen(tk.Frame):
+    def __init__(self, parent, controller:TTPlusController, back_callback):
+        super().__init__(parent, bg="#1e1e1e")
+        self.pack(fill="both", expand=True)
+
+        self.root = parent  # Reference to the main window
+        self.back_callback = back_callback
+        self.current_theme = "dark"  # Default theme    , TODO place into settings
+
+        # --- UI Element References for Redrawing ---
+        self.frames_to_color = []
+        self.entries_to_color = []
+
+        # This is my controller!
+        self.controller = controller
+        self.controller.set_view(self)  # Pass the screen reference to the controller
+
+        # Build the initial layout elements
+        self.create_widgets()
+
+        # Apply the current theme colors immediately
+        self.apply_theme(self.current_theme)
+
+    def create_widgets(self):
+        # Table 1 (Work Tasks)
+        self.frame1 = ttk.LabelFrame(self, text="Work Tasks", style="Modern.TLabelframe")
+        self.frame1.pack(fill="both", padx=8, pady=8)
+
+        columns1 = (("ID", 20), ("Task Name", 400), ("Total work time", 0))
+        self.table1 = TableWidget(self.frame1, columns1)
+        self.table1.si = 1 # column 0 is timestamp, start display from 1
+
+
+        self.controller.populate_table1()
+
+
+        # Editor Row
+        # Frame for Textfield 1 and Delete Button
+        self.frame_task_editor = tk.Frame(self)
+        self.frame_task_editor.pack(pady=8)
+        self.frames_to_color.append(self.frame_task_editor)
+
+        self.textfield_task_name = tk.Entry(
+            self.frame_task_editor,
+            width=50,
+            relief="flat",
+            font=("Tahoma", 11),
+            bd=4
+        )
+        self.textfield_task_name.pack(side="left", padx=8)
+        self.entries_to_color.append(self.textfield_task_name)
+        #textfield_task_name.bind("<KeyRelease>", update_task_name)
+
+
+        # Delete Button
+        #delete_icon = PhotoImage(file="img/del.png")
+        #delete_button = tk.Button(frame_task_editor, image=delete_icon, command=delete_task)
+        #delete_button.pack(side="left")
+
+
+        # Table 2 (Task Details)
+        self.frame2 = ttk.LabelFrame(self, text="Task Details", style="Modern.TLabelframe")
+        self.frame2.pack(fill="both", padx=8, pady=8)
+
+        columns2 = (("Start Time", 20), ("End Time", 20), ("What was done", 500))
+        self.table2 = TableWidget(self.frame2, columns2)
+        #table2.bind("<<TreeviewSelect>>", on_table2_select)
+
+        self.tde=TaskDetailEditor(self)
+        self.tde.pack(pady=5)
+        #tde.set_callback(update_task_details)
+        #tde.task_detail.bind("<KeyRelease>", update_task_detail)
+        #tde.notes.bind("<KeyRelease>", update_task_note)
+        #tde.notes.bind("<KeyRelease>", update_task_note)
+
+    def build_menu(self, colors):
+        """Rebuilds the top menu bar to show current selections and colors smoothly"""
+        # Create a menu bar
+        menu_bar = tk.Menu(self.root)
+        self.root.config(menu=menu_bar)
+
+        # Add the "Help" menu
+        help_menu = tk.Menu(menu_bar, tearoff=0)
+        menu_bar.add_command(label="About", command=self.show_about)
+        menu_bar.add_command(label="Work Report", command=self.show_about)
+        menu_bar.add_command(label="Detail Effort Report", command=self.show_about)
+        menu_bar.add_command(label="Test", command=self.show_about)
+        #menu_bar.add_command(label="TW", command=tw_report)
+        menu_bar.add_command(label="View Note in Browser", command=self.show_about)
+        menu_bar.add_command(label="Show Kanban", command=self.show_about)
+
+        # 2. Setup standard wrapper for the back callback to strip menus
+        def go_back_cleanly():
+            self.root.config(menu="") # Remove the menu bar completely when leaving
+            self.back_callback()
+        menu_bar.add_command(label="Project Manager", command=go_back_cleanly)
+
+        # --- Theme Switcher Cascading Menu ---
+        theme_menu = tk.Menu(menu_bar, tearoff=0)
+        theme_menu.add_command(
+            label="🌙 Dark Mode" if self.current_theme == "dark" else "   Dark Mode",
+            command=lambda: self.apply_theme("dark")
+        )
+        theme_menu.add_command(
+            label="☀️ Bright Mode" if self.current_theme == "bright" else "   Bright Mode",
+            command=lambda: self.apply_theme("bright")
+        )
+        menu_bar.add_cascade(label="🎨 Themes", menu=theme_menu)
+
+    def apply_theme(self, theme_name):
+        """Dynamically applies light or dark visual mappings to all elements"""
+        self.current_theme = theme_name
+        colors = THEMES[theme_name]
+
+        # 1. Rebuild Menu configuration with updated checkboxes/emojis
+        self.build_menu(colors)
+
+        # 2. Update Standard Tkinter backgrounds
+        self.configure(bg=colors["bg_main"])
+
+        for frame in self.frames_to_color:
+            frame.configure(bg=colors["bg_main"])
+
+        for entry in self.entries_to_color:
+            entry.configure(
+                bg=colors["bg_input"],
+                fg=colors["fg_main"],
+                insertbackground=colors["fg_main"] # Text caret color
+            )
+
+        # 3. Update TTK Style Definitions
+        style = ttk.Style()
+        style.theme_use("clam")
+
+        # LabelFrames
+        style.configure("Modern.TLabelframe", background=colors["bg_main"], relief="flat")
+        style.configure(
+            "Modern.TLabelframe.Label",
+            background=colors["bg_main"],
+            foreground=colors["fg_muted"],
+            font=("Arial", 10, "bold")
+        )
+
+        # Treeview Tables
+        style.configure(
+            "Treeview",
+            background=colors["bg_input"],
+            fieldbackground=colors["bg_input"],
+            foreground=colors["fg_main"],
+            rowheight=24
+        )
+        style.configure(
+            "Treeview.Heading",
+            background=colors["tree_header"],
+            foreground=colors["fg_main"],
+            relief="flat",
+            font=("Arial", 10, "bold")
+        )
+        style.map("Treeview.Heading", background=[("active", colors["accent"])])
+
+        # Color the tag selections inside your custom TableWidgets
+        accent_color = colors["accent"]
+        style.map("Treeview", background=[("selected", accent_color)])
+
+        # Update text item tags inside the tables dynamically
+        gray_color = "#888888" if theme_name == "dark" else "#555555"
+        blue_color = "#4a90e2" if theme_name == "dark" else "#106ba3"
+
+        for table in (self.table1, self.table2):
+            table.tag_configure("grey", foreground=gray_color)
+            table.tag_configure("blue", foreground=blue_color)
+
+    def apply_custom_styles(self):
+        style = ttk.Style()
+
+        # Style the TTK LabelFrames to integrate with the dark palette
+        style.configure(
+            "Modern.TLabelframe",
+            background="#1e1e1e",
+            relief="flat"
+        )
+        style.configure(
+            "Modern.TLabelframe.Label",
+            background="#1e1e1e",
+            foreground="#aaaaaa",
+            font=("Arial", 10, "bold")
+        )
+
+        # Style the Treeview headers and rows cleanly
+        style.configure(
+            "Treeview",
+            background="#2d2d2d",
+            fieldbackground="#2d2d2d",
+            foreground="white",
+            rowheight=24
+        )
+        style.configure(
+            "Treeview.Heading",
+            background="#3a3a3a",
+            foreground="white",
+            relief="flat",
+            font=("Arial", 10, "bold")
+        )
+        # Prevent row header flashing an ugly white background on selection
+        style.map("Treeview.Heading", background=[("active", "#4a4a4a")])
+
+    def show_about(self):
+        pass
+
+
+# --- Main Window / Screen Controller ---
+class TTPlusWindow(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title(APP_TITLE)
+        self.geometry("800x700+500+50")
+        self.configure(bg="#1e1e1e")
+
+        # Clean Flat ttk Scrollbar styling
+        self.setup_ttk_styles()
+
+        self.current_screen = None
+        self.show_start_screen()
+
+    def setup_ttk_styles(self):
+        style = ttk.Style()
+        style.theme_use("clam")
+
+        # Minimalist Dark Scrollbar style
+        style.configure(
+            "TScrollbar",
+            background="#3e3e3f",
+            troughcolor="#2d2d2d",
+            arrowcolor="#ffffff",
+            relief="flat",
+            borderwidth=0
+        )
+        style.map("TScrollbar", background=[("active", "#4e4e4f")])
+
+        # Create a menu bar
+        menu_bar = tk.Menu(self)
+        self.config(menu=menu_bar)
+        menu_bar.add_command(label="About", command=self.show_about)
+
+    def show_about(self):
+        pass
+
+    def show_start_screen(self):
+        if self.current_screen:
+            self.current_screen.destroy()
+        self.current_screen = ProjectManagerScreen(self, on_open_callback=self.show_main_app)
+
+    def show_main_app(self, filepath):
+        """
+        Model - View - Controller (MVC) Pattern:
+
+        The Controller needs the screen instance (TTPlusScreen) to know where to insert the data.
+
+        The Screen needs the Controller instance during __init__ to trigger the population.
+
+        Architectural pattern: let the Controller act as the orchestrator.
+        The controller
+         - instantiate the screen,
+          - save a reference to itself inside the screen,
+           - then populate the tables.
+        """
+        if self.current_screen:
+            self.current_screen.destroy()
+
+        # Pass 'self' (the main window) so the controller can mount the screen on it
+
+        self.current_controller = TTPlusController(self, filepath)
+
+        ctl=TTPlusController(self.current_screen, filepath)
+        self.current_screen = TTPlusScreen(
+            self,
+            self.current_controller,
+            back_callback=self.show_start_screen
+        )
+
+
+if __name__ == "__main__":
+    app = TTPlusWindow()
+    app.mainloop()

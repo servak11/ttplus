@@ -89,4 +89,3 @@ if __name__ == "__main__":
     print (column_names)
     print ("_generate_short_id(20250404101919)=",TableWidget._generate_short_id("20250404101919"))
     print ("_generate_short_id(20250404111919)=",TableWidget._generate_short_id("20250404111919"))
-

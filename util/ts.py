@@ -50,6 +50,20 @@ def get_ts( dt : datetime = None, fmt = FMT_LONG):
         dt = datetime.now()
     return dt.strftime(fmt)
 
+def get_fts( dt : float, fmt = FMT_LONG):
+    """
+    Return time in "long" format, a text timestamp
+
+    Parameters:
+        dt (datetime): float timestamp
+        fmt (bool, optional): format string (FMT_LONG, FMT_DATE, ...).
+            Default FMT_LONG
+
+    Returns:
+        str: date and time in selected format
+    """
+    return datetime.fromtimestamp(dt).strftime(fmt)
+
 if __name__ == "__main__":
     print("--- Timestamp Handling Module Demo ---")
 
