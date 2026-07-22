@@ -147,8 +147,8 @@ import const
 
 from mod_db import Database
 
-from ttplus import select_task_by_id, select_task_by_id
-from ttplus import _select_and_scroll
+# from ttplus import select_task_by_id, select_task_by_id
+# from ttplus import _select_and_scroll
 from util.ts import dm_hm, get_dt, FMT_LONG, FMT_DATE
 
 import time as _time
@@ -165,13 +165,15 @@ class TTPlusController( ):
         parent: The parent Tkinter widget where the table will be placed.
         columns: A list of tuples [(column_name, column_width), ...].
     """
-    def __init__(self, view, json_database:str = "tasks.json"):
+    def __init__(self, json_database:str = "tasks.json"):
         """
         Parameters:
             view: The Tkinter widget where the table will be placed.
+            json_database: The project file selected in ProjectManager
         """
 
-        self.view = view
+        # the view does not exist originally (headless)
+        self.view = None
 
         self.note_server = NoteServer()
         self.note_server.start()
@@ -186,6 +188,7 @@ class TTPlusController( ):
         #settings = Database("settings.json").load_data()
 
         self.task_placeholder_id = "00000"
+        self.cur_selected_item = None
 
         # ── Conditional DB save state ─────────────────────────────────────────────────
         self._note_dirty = False
@@ -293,16 +296,11 @@ class TTPlusController( ):
 
         # Append placeholder detail to the database
         # use the same method which does generate_task_id() - because the id is timestamp based
-        #placeholder_detail = {"Start Time": generate_task_id(), "End Time": "", "What was done": "add detail ..."}
         placeholder_detail = (dm_hm(self.generate_task_id()), "", "add detail ...")
         #self.database["task_details"][task_id].append(placeholder_detail)
 
-        # this functoin requires dict, but we havbe just list at the moment it was not zet created
-        #subst_timestamp(placeholder_detail)
-
         # Save database and update the table
         #db.save_data(self.database)
-        #table2.insert("", "end", values=(placeholder_detail["Start Time"], placeholder_detail["End Time"], placeholder_detail["What was done"]),
         self.view.table2.insert_data(placeholder_detail, tags=("grey",))
         #print("add_new_detail_placeholder ")
 
@@ -342,7 +340,7 @@ class TTPlusController( ):
                     # this was a placeholder, convert it into a real task
                     global task_placeholder_id
                     task_id = self.generate_short_task_id(task_placeholder_id)
-                    status_bar.s_set("add new task",task_id)
+                    self.view.status_bar.s_set("add new task",task_id)
                     self.database["work_tasks"][task_id] = {
                                 "fti": task_placeholder_id,
                                 "sti": task_id,
@@ -396,31 +394,29 @@ class TTPlusController( ):
         l[detail_index]["End Time"]     = self.view.tde.get_end_time    ()
         # TODO add automatic end time update as soon as we type in the note or name field
 
-    # Dynamically update Task Detail in Table 2
-    # - originally called this on change in detail name
-    # - now we have more controls in task detail editor
-    #
-    # This function is the central point
-    # of updating the tables AND the database
-    # with the data provided by the task detail editor
-    #
-    # The function is called as a callback from the Task Detail Editor
-    # Because it has full access to database, it provides the following:
-    # d_new_details - the dictionary of changed items only
     def update_task_details(self, d_new_details):
-        #print("d_new_details =",d_new_details)
-        selected_item = self.view.table2.selection()
-        # print("selected_item =",selected_item)
+        """
+        Dynamically update Task Detail in Table 2
+        - originally called this on change in detail name
+        - now we have more controls in task detail editor
 
-        # TODO no need to check selected_item,
-        # it is only possible to land here if it was selected
-        #if selected_item:
+        This function is the central point
+        of updating the tables AND the database
+        with the data provided by the task detail editor
 
+        The function is called as a callback from the Task Detail Editor
+        Because it has full access to database, it provides the following:
+        d_new_details - the dictionary of changed items only
+        """
+        # print("d_new_details =",d_new_details)
         # find index of current note in the database
         task_id = self.view.table1.item(self.view.table1.selection(), "values")[0]
-        detail_index = self.view.table2.index(selected_item[0])
-
         detail_list = self.database["task_details"].get(task_id)
+
+        # it is only possible to land here if a note was selected
+        selected_item = self.view.table2.selection()
+        # print("selected_item =",selected_item)
+        detail_index = self.view.table2.index(selected_item[0])
 
         if(detail_index >= len(detail_list)):
             ### ADD new detail entry to the database
@@ -447,9 +443,9 @@ class TTPlusController( ):
             pass
 
         # read the full row from table 2 to later update it
-        values = self.view.table2.item(selected_item)["values"]
-        new_detail = self.view.tde.get_name()
-        #status_bar.s_set("edit detail",str(detail_index),"of task",str(task_id),new_detail)
+        #values = self.view.table2.item(selected_item)["values"]
+        #new_detail = self.view.tde.get_name()
+        #self.view.status_bar.s_set("edit detail",str(detail_index),"of task",str(task_id),new_detail)
         # print("-- OLD Values = ",values)
 
         # print("updated DATA1 ",
@@ -463,7 +459,6 @@ class TTPlusController( ):
             dm_hm(self.view.tde.d1["Start Time"]),
             dm_hm(self.view.tde.d1["End Time"]),
             str(self.view.tde.d1["What was done"])
-
         )
         ### UPDATE existing detail entry into the table view
         # because the values were updated directly in the database record provided by reference to the editor,
@@ -472,8 +467,7 @@ class TTPlusController( ):
         self.view.table2.item(selected_item, values=l, tags=("blue",))
 
         # Mark note as changed for conditional save
-        global _note_dirty
-        _note_dirty = True
+        self._note_dirty = True
 
     # Delete the selected task from Table 1 and the database
     def delete_task(self):
@@ -506,8 +500,6 @@ class TTPlusController( ):
                 #self.view.table1.event_generate("<<TreeviewSelect>>")  # Trigger selection event
                 break  # Stop after first match
 
-    cur_selected_item = None
-
     # Handle selection of a new task in Table 1
     #
     # Tkinter Treeview, si = table.item(selected_item) returns dictionary
@@ -521,13 +513,12 @@ class TTPlusController( ):
         self.view.tde.stop_clock()
         selected_item = self.view.table1.selection()
         #print("selected_item list = ", selected_item)
-        global cur_selected_item
-        if cur_selected_item == selected_item[0]:
+        if self.cur_selected_item == selected_item[0]:
             # selected item clicked again, nothing to do
             return
-        # remember selected item
-        cur_selected_item = selected_item[0]
-        #print("cur selected_item = ", cur_selected_item)
+        # remember selected item - just to block the repeated selection of the same item
+        self.cur_selected_item = selected_item[0]
+        #print("cur selected_item = ", self.cur_selected_item)
         # tuple
         #print("class = ", selected_item.__class__)
         # read the full data row from table 1
@@ -542,7 +533,7 @@ class TTPlusController( ):
         if selected_item:
             # find the selected task in the database
             task_id = values[0]
-            status_bar.s_set("Selected task ",task_id)
+            self.view.status_bar.s_set("Selected task ",task_id)
             detail_list = self.database["task_details"].get(task_id)
             # detail_list is the list of dictionaries
             #print(" -> assert ",short_task_id,"==",task["sti"])
@@ -606,17 +597,16 @@ class TTPlusController( ):
             None
         """
         # ── Conditional save: if note was edited and 5min cooldown passed ──
-        global _note_dirty, _last_save_time
-        if _note_dirty and (_time.time() - _last_save_time >= SAVE_INTERVAL):
+        if self._note_dirty and (_time.time() - self._last_save_time >= SAVE_INTERVAL):
             try:
                 prev_task_id = self.view.table1.item(self.view.table1.selection(), "values")[0]
                 self.db.save_data(self.database)
-                _last_save_time = _time.time()
+                self._last_save_time = _time.time()
                 self.note_server.notify_changed(prev_task_id)
                 self.view.status_bar.s_set("DB saved, kanban notified")
             except Exception:
                 pass
-            _note_dirty = False
+            self._note_dirty = False
 
         # check if selection was done
         selected_detail = self.view.table2.selection()
@@ -677,18 +667,18 @@ class TTPlusController( ):
                     self.database["task_details"]
                     # TODO interface changed
                 ).strftime(FMT_DATE)
-                status_bar. s_set(
+                self.view.status_bar. s_set(
                     "Timekeeping earliest date " + earliest_date
                 )
                 db_sts = get_dt(d_entry["Start Time"])
-                status_bar. s_act(
+                self.view.status_bar. s_act(
                     db_sts,
                     tracker.check_deviation(d_entry)
                 )
 
             # If the task was overdue, display a red status message
             #if time_diff_minutes != 0:
-            #    status_bar.s_set(datetime.strptime(closest_dt, "%d.%m.%Y%H:%M"))
+            #    self.view.status_bar.s_set(datetime.strptime(closest_dt, "%d.%m.%Y%H:%M"))
 
         self.view.tde.load_data( d_entry )
 
@@ -700,13 +690,13 @@ class TTPlusController( ):
             → mod_flask POST /note       # updates shared state
                 → browser polls 4s later  # renders new note
         """
-        push_note_to_browser()
+        self.push_note_to_browser()
 
-    def show_about():
+    def show_about(self):
         from controls.about import AboutDialog
-        AboutDialog(master=root)
+        AboutDialog(master=self.root)
 
-    def show_report():
+    def show_report(self):
         # go through all
         #detail_list = self.database["task_details"].get(task_id)
         #print("detail_list = ")
