@@ -51,7 +51,7 @@ class MyBrowser:
         #edge_options.add_argument("--headless")
 
         # Improve performance
-        self.edge_options.add_argument("--disable-gpu")  
+        self.edge_options.add_argument("--disable-gpu")
         self.edge_options.add_argument("--disable-features=EdgeIdentity")
         self.edge_options.add_argument("--disable-sync")
         self.edge_options.add_argument("--log-level=3")
@@ -324,14 +324,15 @@ class Tiso(MyBrowser):
           because added from selector element in the end
         """
         first_of_month_str = get_ts(
-            datetime.today().replace(day=20),
+            datetime.today().replace(day=1),
             fmt = FMT_DATE
         )
 
-        USE_TO_DATE = False
+
+        USE_TO_DATE = True
         if USE_TO_DATE: # debug date - once the last date did not work
             todate = get_ts(
-                datetime.today().replace(day=24),
+                datetime.today().replace(day=31),
                 fmt = FMT_DATE
             )
 
@@ -498,11 +499,14 @@ class Tiso(MyBrowser):
         row_count = len(rows)
         print(f"Zeiterfassung HTML loaded. Number of rows: {row_count}")
 
-        # always book to this project
+        # always book to this project (DCP Aufgaben 2025)
         project_key = "9300_2025_Fs-DCP"
-        # key 
+        # key
         # Allg. Aufgaben 2026
+        # OFC Engine
         project_key = "9577"
+        # always book to this project (DCP Aufgaben 2026)
+        project_key = "9300_2026"
 
         # iterate through all rows in the Zeiterfassung HTML table
         row_number = 1
@@ -546,11 +550,17 @@ class Tiso(MyBrowser):
                 # find the select element for "type of work" -- 2nd selector
                 # select.select_by_index(len(select.options) - 1)
                 select_elements = row.find_elements(By.CSS_SELECTOR, "select")
+                #print("- Row select_elements found:", len(select_elements))
                 # now depending on the selector options, select either the last one
-                #select_elements[1].send_keys(Keys.END) # select last option
-                # or the first one
-                select_elements[1].send_keys(Keys.ARROW_DOWN) # select first option
-                
+                if len(select_elements) > 1:
+                    selected_option = Select(select_elements[1]).first_selected_option
+                    #print(selected_option.text) # add option to the list
+                if project_key == "9300_2026":
+                    select_elements[1].send_keys("65") # select 65.10 Entwicklung
+                else:
+                    # or the first one
+                    select_elements[1].send_keys(Keys.ARROW_DOWN) # select first option
+
             row_number += 1
 
 
