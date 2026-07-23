@@ -1120,21 +1120,39 @@ function scrollToCol(col) {
 
 let _reportTextCache = '';
 
-function getWeekBounds() {
+let _weekOffset = 0;  // 0 = current week, -1 = last week, +1 = next week
+
+function getWeekBounds(offset = 0) {
   const now = new Date();
   const day = now.getDay(); // 0=Sun, 1=Mon...
   const diffToMon = day === 0 ? -6 : 1 - day;
   const monday = new Date(now);
   monday.setHours(0, 0, 0, 0);
-  monday.setDate(monday.getDate() + diffToMon);
+  monday.setDate(monday.getDate() + diffToMon + offset * 7);
   const sunday = new Date(monday);
   sunday.setDate(sunday.getDate() + 6);
   sunday.setHours(23, 59, 59, 999);
   return { start: monday, end: sunday };
 }
 
-function buildWeekReport() {
-  const bounds = getWeekBounds();
+function getWeekLabelFor(offset = 0) {
+  const bounds = getWeekBounds(offset);
+  const d = bounds.start;
+  // ISO week calc
+  const target = new Date(d);
+  target.setHours(0,0,0,0);
+  target.setDate(target.getDate() + 3 - (target.getDay() + 6) % 7);
+  const week1 = new Date(target.getFullYear(), 0, 4);
+  const week = 1 + Math.round(((target - week1) / 86400000 - 3 + (week1.getDay() + 6) % 7) / 7);
+  const label = `W${String(week).padStart(2,'0')} / ${target.getFullYear()}`;
+  if (offset === 0) return label;
+  if (offset < 0)  return `${label}  ◀ (${offset})`;
+  return `${label}  ▶ (+${offset})`;
+}
+
+function buildWeekReport(offset = 0) {
+  const bounds = getWeekBounds(offset);
+  const weekLabel = getWeekLabelFor(offset);
   const results = []; // {id, title, weekMin, details: [{what, min}]}
 
   state.projects.forEach(p => {
@@ -1165,11 +1183,31 @@ function buildWeekReport() {
   const sep = '──────────────────────────────────';
   const sep21 = '════════════════════════════════';
   const sep2 = '╞══════════════════════════════════╡';
+  // Build summary rows (extract #nnnnn ticket from title if present)
+  const summary = results.map(r => {
+    const pct = totalMin > 0 ? Math.round((r.weekMin / totalMin) * 100) : 0;
+    const m = r.title.match(/#(\d+)/);
+    const ticket = m ? `#${m[1]}` : '';
+    const cleanTitle = r.title.replace(/#\d+\s*:?\s*/, '').trim();
+    return { pct, ticket, title: cleanTitle };
+  });
+  // Align "<pct>% <ticket>:" left part to a fixed width
+  const leftParts = summary.map(s =>
+    `${s.pct}%${s.ticket ? ' ' + s.ticket : ''}:`
+  );
+  const leftMax = leftParts.reduce((m, s) => Math.max(m, s.length), 0);
+
   // Plain text
   const lines = [sep_s,
-    `┆ WEEK REPORT — ${getWeekLabel()}`,
-    `┆ Total: ${totalH}h`, 
+    `┆ WEEK REPORT — ${weekLabel}`,
+    `┆ Total: ${totalH}h`,
+    `┆`,
   ];
+  summary.forEach((s, i) => {
+    const left = leftParts[i].padEnd(leftMax + 2, ' ');
+    lines.push(`┆   - ${left}${s.title}`);
+  });
+  lines.push(`┆`);
   results.forEach(r => {
     const h = (r.weekMin / 60).toFixed(1);
     const pct = totalMin > 0 ? Math.round((r.weekMin / totalMin) * 100) : 0;
@@ -1185,11 +1223,21 @@ function buildWeekReport() {
   const text = lines.join('\n');
 
   // HTML
-  let html = `<div style="margin-bottom:8px;"><strong><!--WEEK REPORT — ${getWeekLabel()}</strong><br> -->Total: <strong>${totalH}h</strong></div>`;
-  html += `<div style="border-top:2px solid var(--border);margin:8px 0;"></div>`;
+  let html = `<div style="font-size:11px;color:var(--text-3);margin-bottom:6px;">Total: <strong style="color:var(--text);">${totalH}h</strong></div>`;
 
   if (results.length === 0) {
     html += '<em style="color:var(--text-3)">No tasks logged this week.</em>';
+  }
+
+  // Summary block (monospace for alignment)
+  if (summary.length > 0) {
+    html += `<pre style="font-family:var(--mono);font-size:12px;color:var(--text);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;margin:6px 0 12px;line-height:1.5;">`;
+    summary.forEach((s, i) => {
+      const left = leftParts[i].padEnd(leftMax + 2, ' ');
+      const escapedTitle = s.title.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      html += `  - ${left}${escapedTitle}\n`;
+    });
+    html += `</pre>`;
   }
 
   results.forEach(r => {
@@ -1209,13 +1257,18 @@ function buildWeekReport() {
   return { html, text };
 }
 
-function exportWeekReport() {
-  const report = buildWeekReport();
+function renderWeekReport() {
+  const report = buildWeekReport(_weekOffset);
   _reportTextCache = report.text;
-
   document.getElementById('report-view-body').innerHTML = report.html;
+  document.getElementById('timeline-sub').innerHTML =
+    `${getWeekLabelFor(_weekOffset)} <span style="color:var(--text-3);margin-left:8px;">◀ ▶ navigate weeks</span>`;
+}
+
+function exportWeekReport() {
+  _weekOffset = 0;  // always open at current week
+  renderWeekReport();
   document.getElementById('timeline-title').textContent = 'Week Report';
-  document.getElementById('timeline-sub').textContent = getWeekLabel();
 
   // Switch views (close note if open)
   document.getElementById('note-view').classList.remove('active');
@@ -1224,7 +1277,30 @@ function exportWeekReport() {
   document.getElementById('report-view').classList.add('active');
   document.getElementById('btn-copy-report').style.display = '';
   document.getElementById('btn-close-note').style.display = '';
+
+  // Give focus so arrow keys work
+  const rv = document.getElementById('report-view');
+  rv.setAttribute('tabindex', '0');
+  rv.focus();
 }
+
+// Arrow key navigation — active only when report view has focus
+document.addEventListener('keydown', (e) => {
+  const reportView = document.getElementById('report-view');
+  if (!reportView.classList.contains('active')) return;
+  // Only handle if focus is inside report-view
+  if (!reportView.contains(document.activeElement) && document.activeElement !== reportView) return;
+
+  if (e.key === 'ArrowLeft') {
+    _weekOffset -= 1;
+    renderWeekReport();
+    e.preventDefault();
+  } else if (e.key === 'ArrowRight') {
+    _weekOffset += 1;
+    renderWeekReport();
+    e.preventDefault();
+  }
+});
 
 function copyReportText() {
   if (!_reportTextCache) return;

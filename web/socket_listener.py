@@ -3,12 +3,8 @@ import threading
 import tkinter as tk
 from datetime import datetime
 import traceback
-import time
-
-import mod_buchen # <‑‑ вот так Важно: импортировать модуль, а не функцию, чтобы избежать циклических импортов.
 
 PORT = 54321
-
 
 def start_tracking():
     print(">>> start_tracking() called")
