@@ -268,6 +268,23 @@ class TTPlusController( ):
         new_task_id = self.generate_task_id()
         short_task_id = self.generate_short_task_id(new_task_id)
         #print("add_new_task_placeholder new_task_id = ",new_task_id)
+
+        # Task IDs come from a timestamp with 1-second resolution
+        # (generate_task_id -> md5 -> 5-char short id used both as the TreeView
+        # iid and the work_tasks key). If a placeholder is typed into and a fresh
+        # placeholder is created within the same wall-clock second, the new short
+        # id equals the id of the row that was just turned into a real task, and
+        # table1.insert() raises TclError "Item NNNNN already exists" (issue #8).
+        # Disambiguate the seed until the short id is unique among the current
+        # rows and the database keys. The full seed is returned and hashed again
+        # in update_task_name(), so we must return the exact seed hashed here.
+        salt = 0
+        while (short_task_id in self.view.table1.get_children()
+               or short_task_id in self.database["work_tasks"]):
+            salt += 1
+            new_task_id = f"{self.generate_task_id()}{salt:02d}"
+            short_task_id = self.generate_short_task_id(new_task_id)
+
         self.view.table1.insert("", "end", iid=short_task_id, values=(short_task_id, "new task ...", "0"), tags=("grey",))
         return new_task_id
 

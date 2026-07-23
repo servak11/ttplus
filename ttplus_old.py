@@ -227,6 +227,18 @@ def add_new_task_placeholder():
     new_task_id = generate_task_id()
     short_task_id = generate_short_task_id(new_task_id)
     #print("add_new_task_placeholder new_task_id = ",new_task_id)
+
+    # Timestamp IDs have 1-second resolution: a placeholder consumed and
+    # recreated within the same second yields a short id that collides with the
+    # row just turned into a real task -> TclError "Item NNNNN already exists"
+    # (issue #8). Disambiguate the seed until the short id is unique.
+    salt = 0
+    while (short_task_id in table1.get_children()
+           or short_task_id in database["work_tasks"]):
+        salt += 1
+        new_task_id = f"{generate_task_id()}{salt:02d}"
+        short_task_id = generate_short_task_id(new_task_id)
+
     table1.insert("", "end", iid=short_task_id, values=(short_task_id, "new task ...", "0"), tags=("grey",))
     return new_task_id
 
