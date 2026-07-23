@@ -165,18 +165,27 @@ class TTPlusController( ):
         parent: The parent Tkinter widget where the table will be placed.
         columns: A list of tuples [(column_name, column_width), ...].
     """
-    def __init__(self, json_database:str = "tasks.json"):
+    def __init__(self, json_database:str = "tasks.json", note_server=None):
         """
         Parameters:
             view: The Tkinter widget where the table will be placed.
             json_database: The project file selected in ProjectManager
+            note_server: Shared NoteServer owned by the main window. The Flask
+                server binds a single port and must only be started once for the
+                whole application; every project reuses the same instance. When
+                None (e.g. standalone use) a private server is created.
         """
 
         # the view does not exist originally (headless)
         self.view = None
+        # the window reference is filled in once the view is attached
+        self.root = None
 
-        self.note_server = NoteServer()
-        self.note_server.start()
+        # reuse the shared server; only start a private one if none was given
+        if note_server is None:
+            note_server = NoteServer()
+            note_server.start()
+        self.note_server = note_server
 
         self.db = Database(json_database)
         self.database = self.db.load_data()
@@ -196,6 +205,27 @@ class TTPlusController( ):
 
     def set_view(self, view):
         self.view = view
+        # callbacks (show_about, on_kanban_select, _select_and_scroll) schedule
+        # work on the Tkinter main loop through the window reference
+        self.root = view.root
+
+    def close(self):
+        """
+        Finalize the project before its screen is torn down.
+
+        Stops the running detail clock and persists the in-memory database.
+        Called when navigating back to the Project Manager and when the
+        application window is closed.
+        """
+        if self.view is not None:
+            try:
+                self.view.tde.stop_clock()
+            except Exception:
+                pass
+        try:
+            self.db.save_data(self.database)
+        except Exception:
+            pass
 
     # Populate Table 1
     def populate_table1(self):

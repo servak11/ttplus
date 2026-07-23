@@ -17,7 +17,15 @@ There are no automated tests or linting configured.
 
 ## Architecture
 
-**Entry point:** `ttplus.py` — main Tkinter application (~850 lines), creates the GUI and orchestrates all components.
+The application follows a Model-View-Controller (MVC) pattern with a screen-switching main window.
+
+**Entry point:** `ttplus.py` — `TTPlusWindow` (a `tk.Tk` subclass). It owns the single shared Flask `NoteServer`, saves the active project on close, and switches between screens: the Project Manager (start screen) and the work tracker.
+
+**MVC / screens:**
+- `project.py` — `ProjectManagerScreen`, the start screen listing the available project `.json` databases and opening one.
+- `control.py` — `TTPlusController`, the controller holding the in-memory database and all task/detail logic; `close()` persists the project and stops timers.
+- `view.py` — `TTPlusScreen`, the tracker view (two tables + detail editor) with theming and menu; delegates all actions to the controller.
+- `ttplus_old.py` — the original ~850-line monolithic single-file app, kept for reference and superseded by the MVC files above.
 
 **Data layer:**
 - `mod_db.py` — `Database` class providing JSON-based persistence (`tasks.json`)

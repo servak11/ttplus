@@ -87,9 +87,12 @@ class TTPlusScreen(tk.Frame):
 
 
         # Table 2 (Task Details)
+        # frame2 is a ttk widget: it is themed through the "Modern.TLabelframe"
+        # ttk style in apply_theme(), NOT via .configure(bg=...) which ttk
+        # widgets reject ("unknown option -bg"). So keep it out of the
+        # entries_to_color / frames_to_color lists.
         self.frame2 = ttk.LabelFrame(self, text="Task Details", style="Modern.TLabelframe")
         self.frame2.pack(fill="both", padx=5, pady=5)
-        self.entries_to_color.append(self.frame2)
 
         columns2 = (("Start Time", 20), ("End Time", 20), ("What was done", 500))
         self.table2 = TableWidget(self.frame2, columns2)
@@ -99,7 +102,10 @@ class TTPlusScreen(tk.Frame):
         self.tde.pack(pady=5)
         self.tde.set_callback(self.controller.update_task_details)
 
-        self.status_bar = StatusBar(self.root)
+        # parent the status bar to this frame (not the window) so it is
+        # destroyed together with the screen and does not leak onto the
+        # Project Manager after navigating back
+        self.status_bar = StatusBar(self)
 
 
     def build_menu(self, colors):
@@ -122,6 +128,8 @@ class TTPlusScreen(tk.Frame):
         def go_back_cleanly():
             #self.root.config(menu="") # Remove the menu bar completely when leaving
             #self.back_callback()
+            # Persist the project and stop timers before tearing the screen down
+            self.controller.close()
             # Defer removing the menu and destroying the frame by 10ms
             self.root.after(10, lambda: self.root.config(menu=""))
             self.root.after(20, self.back_callback)
