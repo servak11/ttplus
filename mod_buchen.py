@@ -22,9 +22,6 @@ from web.socket_listener import socket_listener
 URL = 'http://menlogphost5.menlosystems.local/tisoware/twwebclient'
 
 
-t=None
-
-
 """
 This is the Zeiterfassung menu as of 28.01.2026
 
@@ -38,9 +35,11 @@ This is the Zeiterfassung menu as of 28.01.2026
             <i class=" fa-light fa-fw fa-sign-in" title="Buchung / Web-Terminal ( PWB )"></i>Buchung / Web-Terminal</a></li>
 <li class="mm-listitem"><a class="conmenu mm-listitem__text" title="Erfassungsmappen ( PEM )" href="#" onmousedown="{setValue(&quot;tekeine&quot;,&quot;WorkSheetPortfolio&quot;);}" onclick="{setValueInForm(&quot;IsReact&quot;,&quot;False&quot;);setValueInForm(&quot;TransID&quot;,&quot;151&quot;); spglNdNew(&quot;WorkSheetPortfolio&quot;);;}" oncontextmenu="{menuContextMenuShow(&quot;id_menu_con&quot;, event); return false;;}"><i class=" fa-light fa-fw fa-folder" title="Erfassungsmappen ( PEM )"></i>Erfassungsmappen</a></li>
 <li class="mm-listitem"><a class="conmenu mm-listitem__text" title="Jahreskalender ( PAE )" href="#" onmousedown="{setValue(&quot;tekeine&quot;,&quot;Calendar&quot;);}" onclick="{setValueInForm(&quot;IsReact&quot;,&quot;False&quot;);setValueInForm(&quot;TransID&quot;,&quot;54&quot;); spglNdNew(&quot;Calendar&quot;);;}" oncontextmenu="{menuContextMenuShow(&quot;id_menu_con&quot;, event); return false;;}"><i class=" fa-light fa-fw" data-icon="N" title="Jahreskalender ( PAE )">  </i>Jahreskalender</a></li>
-<li class="mm-listitem"><a class="conmenu mm-listitem__text" title="Monatsübersicht ( PST )" href="#" onmousedown="{setValue(&quot;tekeine&quot;,&quot;TimeSheet&quot;);}" onclick="{setValueInForm(&quot;IsReact&quot;,&quot;False&quot;);setValueInForm(&quot;TransID&quot;,&quot;35&quot;); spglNdNew(&quot;TimeSheet&quot;);;}" oncontextmenu="{menuContextMenuShow(&quot;id_menu_con&quot;, event); return false;;}"><i class=" fa-light fa-fw" data-icon="v" title="Monatsübersicht ( PST )">  </i>Monatsübersicht</a></li></ul>
+<li class="mm-listitem"><a class="conmenu mm-listitem__text" title="Monatsuebersicht ( PST )" href="#" onmousedown="{setValue(&quot;tekeine&quot;,&quot;TimeSheet&quot;);}" onclick="{setValueInForm(&quot;IsReact&quot;,&quot;False&quot;);setValueInForm(&quot;TransID&quot;,&quot;35&quot;); spglNdNew(&quot;TimeSheet&quot;);;}" oncontextmenu="{menuContextMenuShow(&quot;id_menu_con&quot;, event); return false;;}"><i class=" fa-light fa-fw" data-icon="v" title="Monatsuebersicht ( PST )">  </i>Monatsuebersicht</a></li></ul>
 """
 
+
+# ── Pure helpers (no GUI / no session state) ──────────────────────────────────
 
 # test script to check sanity of the data in the list
 def find_unserializable(obj, path="root"):
@@ -51,317 +50,7 @@ def find_unserializable(obj, path="root"):
         for i, item in enumerate(obj):
             find_unserializable(item, f"{path}[{i}]")
     elif isinstance(obj, datetime):
-        print(f"❌ Unserializable datetime object found at: {path}")
-
-
-
-def add_treeview( root, records ):
-    # Create a Treeview widget for the table
-    #column_names = ("Record No", "Date", "Start Time", "End Time", "Project Key", "Comment", "Project Item")
-    # list comprehension and string manipulation
-    # to extract the field names from the header_info["fields"] list:
-    header_info = tw_data["header"]
-    column_names = [field.split("(str)")[0].strip() for field in header_info["fields"]]
-    tree = ttk.Treeview(root, columns=column_names, show="headings")
-
-    # Define column widths (first 4 narrow, last 3 wide)
-    column_widths = [60, 120, 80, 80, 200, 300, 250]
-
-    for col, width in zip(column_names, column_widths):
-        tree.heading(col, text=col)
-        tree.column(col, width=width)
-
-    # Define the tag with blue foreground
-    tree.tag_configure("blue_text", foreground="blue")
-
-    # Insert records into the table
-    for record in records:
-        # add at the top
-        tree.insert("", 0, values=record)
-
-    return tree
-
-
-def t_login():
-    global t
-    if t and t.is_alive():
-        t.login()
-    else:
-        t = Tiso()
-
-def t_urlaub():
-    """
-    open Abwesenheitserfassung page
-    """
-    menu_text = "Abwesenheitserfassung" # old version
-    #menu_text = "Urlaub" # after 28.01.2026 - this is the request for Urlaub
-    menu_text = "Jahreskalender" # after 28.01.2026
-
-    global t
-
-    if(None==t):
-        print ("Login first!")
-    else:
-        try:
-            if not t.open_trans(menu_text):
-                print ("Sorry cannot open that (normal way) from:")
-                print(t.get_driver().current_url)
-                return
-        except Exception as e:
-            print ("Sorry cannot open that (exception) - window was closed")
-            return
-
-def t_home():
-    """
-    open tisoware user home page
-    """
-    global t
-
-    if(None==t):
-        print ("Login first!")
-    else:
-        try:
-            if not t.open_trans("Home"):
-                print ("Sorry cannot open that (normal way) from:")
-                print(t.get_driver().current_url)
-                return
-        except Exception as e:
-            print ("Sorry cannot open that (exception) - window was closed")
-            return
-
-
-def t_sk():
-    """
-    open Stempelkarte page
-    """
-    menu_text = "Stempelkarte" # old version
-    menu_text = "Monatsübersicht" # after 28.01.2026
-
-    global t
-
-    if(None==t):
-        print ("Login first!")
-    else:
-        try:
-            if not t.open_trans(menu_text):
-                print ("Sorry cannot open that (normal way) from:")
-                print(t.get_driver().current_url)
-                return
-        except Exception as e:
-            print ("Sorry cannot open that (exception) - window was closed")
-            return
-
-
-def t_book_time():
-    print(">>> t_book_time() called")
-    """
-    Original behaviour:
-    ===================
-
-    booking page consists of 3 tabs "reiters"
-    - buchung
-    - gbuchung
-    - abfrage
-
-    <div class="tab-pane pl-3 abfrage reiter" role="tabpanel" id="abfrage" aria-expanded="false"><container>
-    ...
-    </container></div>
-    active reiter has class "active" to the list
-    """
-    global t
-
-    menu_text = "Buchung" # old version
-    menu_text = "Buchung / Web-Terminal" # after 28.01.2026
-
-    # http://menlogphost5.menlosystems.local/tisoware/twwebclient#gbuchung
-    if(None==t)or(not t.is_already_logged_in()):
-        print ("Login first!")
-    else:
-        try:
-            if not t.open_trans(menu_text):
-                print ("Sorry cannot open that (normal way) from:")
-                print(t.get_driver().current_url)
-                return
-        except Exception as e:
-            print ("Sorry cannot open that (exception) - window was closed")
-            return
-
-        d = t.get_driver()
-
-        # Find the element by ID
-        # and Remove the 'active' class using JavaScript from buchung
-        # and Use JavaScript to add the "active" class to gbuchung and abfrage
-        # and this way we see all needed info -- but not the bookign button right?
-        #
-        # To display only the two tables (tblgetBuch and tblabfrage)
-        # inside the container <div class="navcontainer">,
-        # and overwrite any other content inside that container using Selenium,
-        # use JavaScript injection via execute_script.
-        #
-        #div = t.get_byid("buchung")
-        #d.execute_script("arguments[0].classList.remove('active');", div)
-        #
-        # activete getatigte buchungen
-        #div = t.get_byid("li_abfrage")
-        div = t.EW("li_abfrage")
-        if div:
-            div.click()
-        #div = t.get_byid("li_gbuchung")
-        div = t.EW("li_gbuchung")
-        if div:
-            # buchung tab opened success
-            div.click()
-            #table = t.E("tblabfrage")
-            ##d.execute_script("document.getElementById('tblabfrage').style.display = 'block';")
-            js_code = ""
-            # read JavaScript from file
-            # - this script would append summary table
-            #   at the end of the buchung table
-            #   (the summary table is otherwise in a different tab which is nonsense)
-            with open('tblabfrage.js', 'r') as file:
-                js_code = file.read()
-            d.execute_script(js_code)
-
-
-def t_log_time():
-    """
-    This is the main application functionality: log work time (timetrack)
-    The time logging happens when I log on and log off in the booking page,
-    and therefore the times are stored in the tool
-
-    1. read_timetrack_list() from the tool in the browser
-       - analyse the table displayed in the Tiso booking page
-         and create list of records with time information
-
-    2. Prepare to Display the log records in GUI (filter_old_records)
-       - the older records ware loaded into d_tw_data_records (black color)
-       - the new records found in brower will display in blue
-
-    3. update_timetracking( tracker )
-       - the
-    """
-    global t
-    global tree
-    ##global tracker
-    global tw_data
-    # records read from tw_data.json
-    global d_tw_data_records
-    if(None==t):
-        print ("Login first!")
-    else:
-        t.open_trans("Erfassungsmappen")
-        # read records from online database
-        timetrack_list = t.read_timetrack_list()
-        print(f"timetrack_list:")
-        debug_flag = 1
-        if debug_flag:
-            for row in timetrack_list:
-                print("  -- " + str(row))
-        # get scope of dates from online records
-        (earliest, latest) = analyze_timtrack_records(timetrack_list)
-        print ("Read timetrack_list from date range:")
-        print(f"  ** Earliest timestamp: {earliest}")
-        print(f"  ** Latest   timestamp: {latest}")
-
-        db = Database()
-        database = db.load_data()
-        print(f"Loaded Database '{db.filename}'.")
-        d_ttplus_task_details = database["task_details"]
-        print(f"Database contains '{len(d_ttplus_task_details)}' detail records.")
-
-        print("Running TW report for online data:")
-        report_tracker = TimeTracking()
-        earliest_date = report_tracker.tw_report(
-            d_ttplus_task_details,
-            timetrack_list,
-            empty_project_only=True
-        )
-        print("*** report_tracker.print_timetrack_deviation()")
-        report_tracker.print_timetrack_deviation()
-        print("*** Done TW report.")
-
-
-        # leave only "old" records just for display
-        d_tw_data_records = filter_old_records(timetrack_list, d_tw_data_records)
-        if debug_flag:
-            print ("There are", len(d_tw_data_records), "records after filtering.")
-            print ("Adding", len(timetrack_list), "records from timetrack_list.")
-
-
-        tw_data["header"]["updated_on"] = get_ts(datetime.now(), fmt=FMT_DATE)
-        tw_data["header"]["date range"] = f"{earliest} - {latest}"
-        # combine the lists
-
-        # store the combined list in the database (json file)
-        tw_data["records"] = d_tw_data_records + timetrack_list
-        FILENAME_TIMETRACK = "tw_data.json"
-        write_timetrack_json( FILENAME_TIMETRACK, tw_data)
-
-        # clear the tree in GUI
-        for item in tree.get_children():
-            tree.delete(item)
-
-        # Insert "old" records into the table in black
-        for record in d_tw_data_records:
-            # add newest at the top
-            tree.insert("", 0, values=record)
-
-        # Insert "new" records into the table in blue
-        for record in timetrack_list:
-            # add newest at the top
-            tree.insert("", 0, values=record, tags=("blue_text",))
-
-        # resume working in displayed browser
-        # will do nothing and return if browse was not executed
-        # the tracker. deviation information conains the notes to log work
-        t.update_timetracking( report_tracker )
-
-
-        # tracker does not work
-        # shall
-        # 1. load ttplus, filter by dates (earliest, latest)
-        # 2. calc deviation between ttplus and timetrack
-        # 3. loop through deviation and find closest for every row
-        # 4. write to row
-        # 5. write to tw_data (update)
-
-
-def add_toolbar( root ):
-
-    # Toolbar frame
-    toolbar = tk.Frame(root)
-    toolbar.pack(side="top", fill="x")
-
-    # Add buttons to the toolbar
-    btn_login   = tk.Button(toolbar, text="Login" , command=t_login)
-    b2  = tk.Button(toolbar, text="Home", command=t_home)
-    b2.pack(side="left", padx=2, pady=2)
-    btn_book    = tk.Button(toolbar, text="Book"  , command=t_book_time)
-    btn_report  = tk.Button(toolbar, text="Report", command=t_log_time)
-
-    btn_login.pack(side="left", padx=2, pady=2)
-    btn_book.pack(side="left", padx=2, pady=2)
-    btn_report.pack(side="left", padx=2, pady=2)
-
-    b2  = tk.Button(toolbar, text="See Urlaub", command=t_urlaub)
-    b2.pack(side="left", padx=2, pady=2)
-
-    b2  = tk.Button(toolbar, text="Stempelkarte", command=t_sk)
-    b2.pack(side="left", padx=2, pady=2)
-
-# Function to show menu on row click
-def show_menu(event):
-    item = tree.identify_row(event.y)
-    if item:
-        tree.selection_set(item)  # Select the clicked row
-        menu.post(event.x_root, event.y_root)
-
-def add_menu(root):
-    # Create a right-click menu
-    menu = tk.Menu(root, tearoff=0)
-    menu.add_command(label="Edit", command=lambda: print("Edit selected row"))
-    menu.add_command(label="Delete", command=lambda: print("Delete selected row"))
-    return menu
+        print(f"Unserializable datetime object found at: {path}")
 
 
 def analyze_timtrack_records(records):
@@ -419,12 +108,9 @@ def read_timetrack_json(jsonfn):
 
 def write_timetrack_json(jsonfn, tw_data):
     """write database of timetrack records to json file"""
-    # check
-    #find_unserializable(tw_data["records"], path="tw_data")
-    if 1:
-        with open(jsonfn, "w", encoding="utf-8") as json_file:
-            json.dump( tw_data, json_file, indent=2)
-        print(f"Timetracking info stored to JSON file '{jsonfn}'")
+    with open(jsonfn, "w", encoding="utf-8") as json_file:
+        json.dump( tw_data, json_file, indent=2)
+    print(f"Timetracking info stored to JSON file '{jsonfn}'")
 
 
 def filter_old_records( timetrack_list, records):
@@ -465,108 +151,341 @@ def filter_old_records( timetrack_list, records):
         k = k + 1
     return filtered_records
 
-if __name__ == "__main__":
+
+# ── BuchenScreen: the Tisoware timetracking applet ────────────────────────────
+
+class BuchenScreen(tk.Toplevel):
+    """
+    Company timetracking applet (Tisoware / Selenium booking interface).
+
+    Launched from the ttplus tracker as a separate, persistent window
+    (a "kind of applet"). It shows the timetracking records read from
+    tw_data.json and lets the user log in to Tisoware, book work times,
+    and pull the "Erfassungsmappen" report. Deviations are matched against
+    the ttplus task details of the currently open project (json_database).
+
+    Why a Toplevel and not a switched screen:
+        The Selenium session (self.t) and the single socket listener are
+        expensive/awkward to rebuild. Keeping the applet in its own window
+        lets the user navigate the main window (Project Manager / tracker)
+        without tearing the browser session down.
+
+    Parameters:
+        parent:        the long-lived main window (TTPlusWindow).
+        json_database: the ttplus project file to match bookings against.
+    """
+
+    # A single socket listener per process; started once (see plan section 3.5).
+    _socket_started = False
+    # The currently open applet, so the socket-triggered booking finds a target.
+    _active = None
+
+    DEFAULT_COLUMNS = ("Record No", "Date", "Start Time", "End Time",
+                       "Project Key", "Comment", "Project Item")
     FILENAME_TIMETRACK = "tw_data.json"
-    # option to execute online browsing for tw data
-    OPT_UPDATE_DATABASE = False
 
-    """
-    Procedure:
-    ----------
-    1. Open selenium in GUI mode (no headless) - because need to review input
-    2. Run:
-       timetrack_list = Tiso.read_timetrack_list()
-       # creates list of timetrack entries, some filled and some empty
-    3. Load tasks.json database using mod_db
-    4. Create tracker = TimeTracking() from mod_timetrack
-       execute tracker.tw_report with option empty_project_only=True
-    5. Iterate through empty entries, fill in project and subproject part
-       and add comment from the timetrack_deviation list
-    """
+    def __init__(self, parent, json_database="tasks.json"):
+        super().__init__(parent)
+        self.title("Timetracking Records")
 
-    tw_data = {}
-    # Check if the file exists
-    if not os.path.exists(FILENAME_TIMETRACK):
-        print(f"Database '{FILENAME_TIMETRACK}' does not exist.")
-    else:
-        print(f"Database '{FILENAME_TIMETRACK}' found - will show in GUI")
-        tracker_db = Database(FILENAME_TIMETRACK)
-        tw_data = tracker_db.load_data()
+        self.parent = parent
+        # ttplus project whose task details we match bookings against
+        self.json_database = json_database
 
-    # Extract records from JSON structure
-    d_tw_data_records = tw_data.get("records", [])
+        # Selenium session, created lazily on the first Login click
+        self.t = None
 
-    if 0:
-        tracker = TimeTracking()
-        print("Running TW report:")
-        #find_unserializable(tw_data["records"][1], path="tw_data")
-        earliest_date = tracker.tw_report(
+        # timetrack records database (from Tisoware) - separate from the project db
+        self.tw_data = {}
+        if os.path.exists(self.FILENAME_TIMETRACK):
+            print(f"Database '{self.FILENAME_TIMETRACK}' found - will show in GUI")
+            self.tw_data = Database(self.FILENAME_TIMETRACK).load_data()
+        else:
+            print(f"Database '{self.FILENAME_TIMETRACK}' does not exist.")
+        self.records = self.tw_data.get("records", [])
+
+        self._setup_style()
+        self._place_right_half()
+        self._build_widgets()
+
+        # register as the active applet and make sure the socket listener runs
+        BuchenScreen._active = self
+        self._start_socket_listener_once()
+
+        # closing the applet must not close the whole application
+        self.protocol("WM_DELETE_WINDOW", self._on_close)
+
+    # ---- layout ----
+
+    def _setup_style(self):
+        style = ttk.Style()
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+        # dedicated style so we do not clobber the main app's Treeview fonts
+        style.configure("Buchen.Treeview", font=("Lucida Console", 9))
+        style.configure("Buchen.Treeview.Heading", font=("Lucida Console", 9, "bold"))
+
+    def _place_right_half(self):
+        # position the window on the right half of the screen
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight() - 200
+        window_width = screen_width // 2
+        window_height = screen_height
+        self.geometry(f"{window_width}x{window_height}+{screen_width // 2}+0")
+
+    def _build_widgets(self):
+        # toolbar on top, status bar on the bottom, table fills the rest
+        self._build_toolbar()
+
+        self.status_var = tk.StringVar(master=self, value="Ready")
+        status = tk.Label(self, textvariable=self.status_var,
+                          bd=1, relief=tk.SUNKEN, anchor="w")
+        status.pack(side=tk.BOTTOM, fill=tk.X)
+
+        self.tree = self._build_treeview()
+        self.menu = self._build_context_menu()
+        # show a right-click menu when a table row is clicked
+        self.tree.bind("<Button-3>", self._show_menu)        # Windows/Linux
+        self.tree.bind("<Control-Button-1>", self._show_menu) # Mac
+        self.tree.pack(expand=True, fill="both")
+
+    def _build_treeview(self):
+        header_info = self.tw_data.get("header", {})
+        fields = header_info.get("fields")
+        if fields:
+            # extract field names from the "name (str)..." header entries
+            column_names = [f.split("(str)")[0].strip() for f in fields]
+        else:
+            column_names = list(self.DEFAULT_COLUMNS)
+
+        tree = ttk.Treeview(self, columns=column_names,
+                            show="headings", style="Buchen.Treeview")
+
+        # first 4 columns narrow, last 3 wide
+        column_widths = [60, 120, 80, 80, 200, 300, 250]
+        for col, width in zip(column_names, column_widths):
+            tree.heading(col, text=col)
+            tree.column(col, width=width)
+
+        tree.tag_configure("blue_text", foreground="blue")
+
+        # newest at the top
+        for record in self.records:
+            tree.insert("", 0, values=record)
+        return tree
+
+    def _build_context_menu(self):
+        menu = tk.Menu(self, tearoff=0)
+        menu.add_command(label="Edit", command=lambda: print("Edit selected row"))
+        menu.add_command(label="Delete", command=lambda: print("Delete selected row"))
+        return menu
+
+    def _show_menu(self, event):
+        item = self.tree.identify_row(event.y)
+        if item:
+            self.tree.selection_set(item)  # select the clicked row
+            self.menu.post(event.x_root, event.y_root)
+
+    def _build_toolbar(self):
+        toolbar = tk.Frame(self)
+        toolbar.pack(side="top", fill="x")
+        buttons = (
+            ("Login",        self.login),
+            ("Home",         self.home),
+            ("Book",         self.book_time),
+            ("Report",       self.log_time),
+            ("See Urlaub",   self.urlaub),
+            ("Stempelkarte", self.sk),
+        )
+        for text, command in buttons:
+            tk.Button(toolbar, text=text, command=command).pack(
+                side="left", padx=2, pady=2)
+
+    def _log(self, msg):
+        print("STATUS:", msg)
+        try:
+            self.status_var.set(str(msg))
+        except Exception:
+            pass
+
+    # ---- Tisoware session actions ----
+
+    def login(self):
+        if self.t and self.t.is_alive():
+            self.t.login()
+        else:
+            self.t = Tiso()
+        self._log("Login requested")
+
+    def _open_trans(self, menu_text):
+        """Open a Tisoware menu transaction; returns True on success."""
+        if self.t is None:
+            self._log("Login first!")
+            return False
+        try:
+            if not self.t.open_trans(menu_text):
+                self._log("Sorry cannot open that (normal way)")
+                print(self.t.get_driver().current_url)
+                return False
+        except Exception:
+            self._log("Sorry cannot open that (exception) - window was closed")
+            return False
+        return True
+
+    def home(self):
+        """open tisoware user home page"""
+        self._open_trans("Home")
+
+    def urlaub(self):
+        """open Abwesenheitserfassung / Jahreskalender page"""
+        self._open_trans("Jahreskalender")
+
+    def sk(self):
+        """open Stempelkarte / Monatsuebersicht page"""
+        self._open_trans("Monatsuebersicht")
+
+    def book_time(self):
+        """
+        Open the Tisoware booking page and inject tblabfrage.js so the
+        summary table is appended to the booking table.
+        """
+        print(">>> book_time() called")
+        menu_text = "Buchung / Web-Terminal"  # after 28.01.2026
+
+        if (self.t is None) or (not self.t.is_already_logged_in()):
+            self._log("Login first!")
+            return
+
+        if not self._open_trans(menu_text):
+            return
+
+        d = self.t.get_driver()
+
+        # activate the "getatigte buchungen" (abfrage) tab, then gbuchung,
+        # then append the summary table via the injected script
+        div = self.t.EW("li_abfrage")
+        if div:
+            div.click()
+        div = self.t.EW("li_gbuchung")
+        if div:
+            div.click()
+            with open("tblabfrage.js", "r") as file:
+                js_code = file.read()
+            d.execute_script(js_code)
+
+    def log_time(self):
+        """
+        Main functionality: read the online timetrack records, match them
+        against the current ttplus project, store the merged list, and refresh
+        the table (old records black, new records blue).
+        """
+        if self.t is None:
+            self._log("Login first!")
+            return
+
+        self.t.open_trans("Erfassungsmappen")
+
+        # read records from online database
+        timetrack_list = self.t.read_timetrack_list()
+        print("timetrack_list:")
+        for row in timetrack_list:
+            print("  -- " + str(row))
+
+        (earliest, latest) = analyze_timtrack_records(timetrack_list)
+        print("Read timetrack_list from date range:")
+        print(f"  ** Earliest timestamp: {earliest}")
+        print(f"  ** Latest   timestamp: {latest}")
+
+        # match against the currently open ttplus project (not a fixed default)
+        db = Database(self.json_database)
+        database = db.load_data()
+        print(f"Loaded Database '{db.filename}'.")
+        d_ttplus_task_details = database["task_details"]
+        print(f"Database contains '{len(d_ttplus_task_details)}' detail records.")
+
+        print("Running TW report for online data:")
+        report_tracker = TimeTracking()
+        report_tracker.tw_report(
             d_ttplus_task_details,
-            d_tw_data_records,
+            timetrack_list,
             empty_project_only=True
         )
-        tracker.print_timetrack_deviation()
-        print("Done TW report.")
-        #find_unserializable(tw_data["records"][1], path="tw_data")
+        report_tracker.print_timetrack_deviation()
+        print("*** Done TW report.")
+
+        # leave only "old" records just for display
+        self.records = filter_old_records(timetrack_list, self.records)
+        print("There are", len(self.records), "records after filtering.")
+        print("Adding", len(timetrack_list), "records from timetrack_list.")
+
+        self.tw_data.setdefault("header", {})
+        self.tw_data["header"]["updated_on"] = get_ts(datetime.now(), fmt=FMT_DATE)
+        self.tw_data["header"]["date range"] = f"{earliest} - {latest}"
+        # combine and store the merged list in the json file
+        self.tw_data["records"] = self.records + timetrack_list
+        write_timetrack_json(self.FILENAME_TIMETRACK, self.tw_data)
+
+        # refresh the table
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+        # "old" records in black (newest on top)
+        for record in self.records:
+            self.tree.insert("", 0, values=record)
+        # "new" records in blue
+        for record in timetrack_list:
+            self.tree.insert("", 0, values=record, tags=("blue_text",))
+
+        # resume working in the displayed browser (no-op if browser not open)
+        self.t.update_timetracking(report_tracker)
+
+    # ---- socket listener (single instance per process) ----
+
+    @classmethod
+    def _start_socket_listener_once(cls):
+        """
+        Start the remote-trigger socket listener exactly once for the whole
+        process. The listener is a daemon with a blocking accept loop, so it
+        cannot be cleanly stopped; starting it more than once would stack
+        threads fighting over the same port. Bookings are dispatched to
+        whichever applet is currently open (cls._active).
+        """
+        if cls._socket_started:
+            return
+        cls._socket_started = True
+
+        # schedule GUI work on the long-lived main window, not on the applet,
+        # so the callback keeps working across applet open/close cycles
+        root = cls._active.parent
+        cls._socket_status_var = tk.StringVar(master=root, value="socket idle")
+        thread = threading.Thread(
+            target=socket_listener,
+            args=(root, cls._socket_status_var, cls._dispatch_book),
+            daemon=True,
+        )
+        thread.start()
+        print("started socket listener thread for BuchenScreen")
+
+    @classmethod
+    def _dispatch_book(cls):
+        # runs on the Tkinter main thread (socket_listener uses root.after)
+        if cls._active is not None:
+            cls._active.book_time()
+        else:
+            print("BuchenScreen: remote booking ignored - applet is closed")
+
+    def _on_close(self):
+        if BuchenScreen._active is self:
+            BuchenScreen._active = None
+        self.destroy()
 
 
-    # Create the Tkinter window
+if __name__ == "__main__":
+    # Standalone launch: hide an empty root and show the applet as a Toplevel.
     root = tk.Tk()
-    root.title("Timetracking Records")
-    #root.geometry("1200x600")  # Set window size to 800x600 pixels
-    # please root window at ("Right Half of Screen")
-
-    # Create a style object
-    style = ttk.Style()
-    style.theme_use("clam")  # Optional: use a clean theme
-
-    # Set font for Treeview rows
-    style.configure("Treeview", font=("Lucida Console", 9))
-
-    # Set font for Treeview headings
-    style.configure("Treeview.Heading", font=("Lucida Console", 9, "bold"))
-
-    # Get screen dimensions
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight() - 200
-
-    # Set width to half, height to full
-    window_width = screen_width // 2
-    window_height = screen_height
-
-    # Position at right half (x = screen_width // 2)
-    root.geometry(f"{window_width}x{window_height}+{screen_width // 2}+0")
-
-    tree = add_treeview( root, d_tw_data_records )
-
-    menu = add_menu(root)
-
-    # The Tkinter table displaying timetracking records
-    # shall have action displaying menu
-    # when man clicks any of the table rows
-    #
-    # Bind right-click action to the table
-    tree.bind("<Button-3>", show_menu)  # Right-click (Windows/Linux)
-    tree.bind("<Control-Button-1>", show_menu)  # Ctrl+Left-click (Mac)
-
-    # Pack the table into the window
-    tree.pack(expand=True, fill="both")
-
-    add_toolbar( root )
-
-    status_var = tk.StringVar()
-    status_var.set("Initializing…")
-
-    thread = threading.Thread(
-        target  = socket_listener,
-        args    = (
-            root,
-            status_var,
-            t_book_time
-        ),
-    daemon=True )
-    thread.start()
-    print("started thread w callback = ", t_book_time)
-
-    # Run the Tkinter loop
+    root.withdraw()
+    app = BuchenScreen(root, json_database="tasks.json")
+    # exit the process when the applet window is closed
+    app.protocol("WM_DELETE_WINDOW", root.destroy)
     root.mainloop()

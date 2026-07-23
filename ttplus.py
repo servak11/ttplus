@@ -35,6 +35,8 @@ class TTPlusWindow(tk.Tk):
 
         self.current_screen = None
         self.current_controller = None
+        # the Tisoware booking applet is a separate persistent window
+        self.buchen_applet = None
         self.show_start_screen()
 
     def setup_ttk_styles(self):
@@ -95,6 +97,27 @@ class TTPlusWindow(tk.Tk):
             self.current_controller,
             back_callback=self.show_start_screen
         )
+
+    def show_buchen(self, json_database):
+        """
+        Open the Tisoware booking applet for the given project.
+
+        A single persistent applet window is kept; if it is already open it is
+        just raised and refocused. Imported lazily so the app can start without
+        Selenium installed (only the applet needs it).
+        """
+        if self.buchen_applet is not None and self.buchen_applet.winfo_exists():
+            self.buchen_applet.json_database = json_database
+            self.buchen_applet.deiconify()
+            self.buchen_applet.lift()
+            self.buchen_applet.focus_force()
+            return
+        try:
+            from mod_buchen import BuchenScreen
+        except Exception as e:
+            print("Cannot open Buchen applet:", e)
+            return
+        self.buchen_applet = BuchenScreen(self, json_database)
 
     def on_close(self):
         """Persist the active project (if one is open) and close the window."""

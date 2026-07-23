@@ -765,6 +765,10 @@ class TTPlusController( ):
     def show_kanban(self):
         self.note_server.show_kanban()   # opens http://127.0.0.1:5000/kanban
 
+    def show_buchen(self):
+        # open the Tisoware booking applet for the currently open project
+        self.root.show_buchen(self.db.filename)
+
     def push_note_to_browser(self):
         """Push the currently selected task detail note to the Flask viewer."""
         try:

@@ -123,6 +123,7 @@ class TTPlusScreen(tk.Frame):
         #menu_bar.add_command(label="TW", command=tw_report)
         menu_bar.add_command(label="View Note in Browser", command=self.controller.push_note_to_browser)
         menu_bar.add_command(label="Show Kanban", command=self.controller.show_kanban)
+        menu_bar.add_command(label="Timetracking (Buchen)", command=self.controller.show_buchen)
 
         # 2. Setup standard wrapper for the back callback to strip menus
         def go_back_cleanly():
