@@ -30,7 +30,7 @@ from controls.datelabel import DateLabel
 import webbrowser
 import re
 
-from config import settings
+from app_settings import settings
 
 class TaskDetailEditor(tk.LabelFrame):
     def __init__(self, master, **kwargs):
