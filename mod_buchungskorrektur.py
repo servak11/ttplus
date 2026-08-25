@@ -1,7 +1,9 @@
 """Automate Buchungskorrektur posting to Tisoware via REST API.
 
-Reads work entries from markdown log, maps project codes to activities,
-and posts them to Tisoware's Buchungskorrektur workflow.
+Reads work entries either from a markdown log (project code written between
+colons on each line) or straight from a ttplus tasks.json database, maps
+project codes to activities, and posts them to Tisoware's Buchungskorrektur
+workflow.
 """
 
 import json
@@ -66,6 +68,10 @@ class LogEntry(NamedTuple):
     to_time: str
     project: str
     comment: str
+    # Originating ttplus task name. Only set when the entries came from a
+    # tasks.json database; the markdown log folds it into the comment.
+    # project is None when the task name has no PROJECT mapping yet.
+    task: str = ""
 
 
 PROJECT_ACTIVITY_MAP = {
@@ -73,6 +79,40 @@ PROJECT_ACTIVITY_MAP = {
     "Allg. Aufgaben 2026": "10.10",
     "9567_AQURA": "54.10",
 }
+
+# ttplus task name -> project code. A tasks.json database records no project,
+# so the mapping is recovered from how the same task names were booked in the
+# July 2026 log. A name that is missing here stops the run rather than being
+# guessed at, so nothing lands on the wrong project.
+TASK_PROJECT_MAP = {
+    "#19078: ESD conformant box": "9300_2026",
+    "#19118 MWUBC Bias Controller Firmware": "9567_AQURA",
+    "#19183 canopen-bootloader": "9567_AQURA",
+    "Bringin up new PC": "9300_2026",
+    "Issue #19397": "9300_2026",
+    "Meetings": "Allg. Aufgaben 2026",
+    "Refactor MiGA 3.0rc": "9300_2026",
+    "Timekeeping": "Allg. Aufgaben 2026",
+    "coffee tool": "9300_2026",
+}
+
+# Placeholder rows entered on Thursday so the reported work percentage came
+# out right. The Friday work itself is logged under the real projects, so
+# booking these would double-count it.
+IGNORED_TASKS = {
+    "Friday task pleaceholder / Planner",
+}
+
+# Tisoware's Kommentar field is short, so only a prefix of the task name goes
+# in front of the description as context.
+TASK_NAME_PREFIX = 13
+COMMENT_SEPARATOR = "/"
+
+# Tisoware refuses a day totalling more than this.
+MAX_DAY_MINUTES = 10 * 60
+
+# Not a Tisoware rule, only worth pointing out in the summary.
+FULL_DAY_MINUTES = 8 * 60
 
 
 def parse_log_file(path: Path) -> list[LogEntry]:
@@ -111,6 +151,74 @@ def parse_log_file(path: Path) -> list[LogEntry]:
             ))
 
     return entries
+
+
+def build_comment(task: str, done: str) -> str:
+    """Kommentar text: a short task-name prefix, then what was done."""
+    return f"{task[:TASK_NAME_PREFIX].rstrip()}{COMMENT_SEPARATOR}{done}"
+
+
+def parse_json_file(path: Path) -> list[LogEntry]:
+    """Parse a ttplus tasks.json database into log entries.
+
+    work_tasks maps a short task id to metadata carrying the task name (tnm);
+    task_details maps the same id to the timed rows, whose "Start Time" and
+    "End Time" are YYYYMMDDHHMMSS. A task name with no TASK_PROJECT_MAP entry
+    yields project=None for the caller to report -- see find_unmapped().
+
+    Every row is returned as recorded, including IGNORED_TASKS rows and any
+    that end before they start, so that dropping them stays visible to the
+    caller (see drop_ignored() and find_inverted()).
+    """
+    with open(path) as f:
+        db = json.load(f)
+
+    tasks = db.get("work_tasks", {})
+    details = db.get("task_details", {})
+
+    entries = []
+    for sti, rows in details.items():
+        task = tasks.get(sti, {}).get("tnm", "")
+        for row in rows:
+            start = row.get("Start Time", "")
+            end = row.get("End Time", "")
+            if len(start) < 12 or len(end) < 12:
+                continue
+            entries.append(LogEntry(
+                date=date(int(start[0:4]), int(start[4:6]), int(start[6:8])),
+                from_time=f"{start[8:10]}:{start[10:12]}",
+                to_time=f"{end[8:10]}:{end[10:12]}",
+                project=TASK_PROJECT_MAP.get(task),
+                comment=build_comment(task, row.get("What was done", "")),
+                task=task,
+            ))
+
+    return entries
+
+
+def load_entries(path: Path) -> list[LogEntry]:
+    """Read either a tasks.json database or a markdown log, by suffix.
+
+    Returns every row; call drop_ignored() to apply IGNORED_TASKS.
+    """
+    if path.suffix.lower() == ".json":
+        return parse_json_file(path)
+    return parse_log_file(path)
+
+
+def drop_ignored(entries: list[LogEntry]) -> list[LogEntry]:
+    """Remove rows whose task is in IGNORED_TASKS. Markdown entries carry no
+    task name and so are never affected."""
+    return [e for e in entries if e.task not in IGNORED_TASKS]
+
+
+def find_unmapped(entries: list[LogEntry]) -> dict[str, int]:
+    """Task names with no project mapping, and how many entries each covers."""
+    counts = {}
+    for e in entries:
+        if e.project is None:
+            counts[e.task] = counts.get(e.task, 0) + 1
+    return counts
 
 
 def group_by_date(entries: list[LogEntry]) -> dict[date, list[LogEntry]]:
@@ -209,6 +317,229 @@ def format_day_header(date_str: str, count: int, minutes: int) -> str:
     return f"{left}{' ' * pad}{right}"
 
 
+def find_inverted(entries: list[LogEntry]) -> list[int]:
+    """Indices of entries whose end time is before their start time. A stop
+    recorded against the wrong row leaves these in the database; they would
+    make the day total too small and confuse the overlap arithmetic."""
+    return [i for i, e in enumerate(entries)
+            if to_minutes(e.to_time) < to_minutes(e.from_time)]
+
+
+def swap_inverted(entries: list[LogEntry]) -> tuple[list[LogEntry], list[str]]:
+    """Read every backwards entry the other way round, which is what a
+    swapped pair of timestamps means."""
+    out = list(entries)
+    notes = []
+    for i in find_inverted(out):
+        notes.append(f"[{i}] {out[i].from_time}-{out[i].to_time} ->"
+                     f" {out[i].to_time}-{out[i].from_time}")
+        out[i] = out[i]._replace(from_time=out[i].to_time,
+                                 to_time=out[i].from_time)
+    return sorted(out, key=lambda e: to_minutes(e.from_time)), notes
+
+
+def resolve_inverted(entries: list[LogEntry]) -> Optional[list[LogEntry]]:
+    """Interactively clear backwards entries. Returns the adjusted entries, or
+    None to skip the day."""
+    while True:
+        inverted = find_inverted(entries)
+        if not inverted:
+            return sorted(entries, key=lambda e: to_minutes(e.from_time))
+
+        flagged = set(inverted)
+        print(f"\n{BOLD}{len(inverted)} entry(s) end before they start:{OFF}")
+        for i in inverted:
+            span = (to_minutes(entries[i].to_time)
+                    - to_minutes(entries[i].from_time))
+            print(f"  {RED}[{i}] {entries[i].from_time}-{entries[i].to_time}"
+                  f" ({span} min){OFF}")
+        print()
+        print_day_entries(entries, flagged)
+
+        print("\n  1 = swap the times (read them the other way round)")
+        print("  d = drop an entry")
+        print("  k = skip this day")
+        choice = ask("Choose [1/d/k]: ").lower()
+
+        if choice == "k":
+            return None
+
+        if choice == "1":
+            entries, notes = swap_inverted(entries)
+            for note in notes:
+                print(f"  {note}")
+            continue
+
+        if choice == "d":
+            entries = drop_entry(entries)
+            continue
+
+        print("  please answer 1, d or k")
+
+
+def trim_from_end(entries: list[LogEntry],
+                  limit: int = MAX_DAY_MINUTES) -> tuple[list[LogEntry], list[str]]:
+    """Cut the day back to the limit, taking the minutes off the latest
+    entries first.
+
+    Shortening only the last entry is not enough -- on 19.08 the day was 60
+    min over but its last entry only ran 45 min -- so the cut walks backwards,
+    consuming one entry at a time. An entry that is used up entirely is
+    dropped rather than left as a zero-length booking.
+    """
+    out = sorted(entries, key=lambda e: to_minutes(e.from_time))
+    excess = day_minutes(out) - limit
+    if excess <= 0:
+        return out, []
+
+    notes = []
+    keep = list(out)
+    for i in range(len(keep) - 1, -1, -1):
+        if excess <= 0:
+            break
+        span = to_minutes(keep[i].to_time) - to_minutes(keep[i].from_time)
+        if span <= 0:
+            continue
+        cut = min(span, excess)
+        if cut == span:
+            notes.append(f"[{i}] {keep[i].from_time}-{keep[i].to_time}"
+                         f" dropped (-{cut} min)")
+            keep[i] = None
+        else:
+            new_end = to_hhmm(to_minutes(keep[i].to_time) - cut)
+            notes.append(f"[{i}] end {keep[i].to_time} ->"
+                         f" {new_end} (-{cut} min)")
+            keep[i] = keep[i]._replace(to_time=new_end)
+        excess -= cut
+
+    return [e for e in keep if e is not None], notes
+
+
+def resolve_over_limit(entries: list[LogEntry],
+                       limit: int = MAX_DAY_MINUTES) -> Optional[list[LogEntry]]:
+    """Interactively bring a day under the Tisoware limit. Returns the
+    adjusted entries, or None to skip the day."""
+    while True:
+        total = day_minutes(entries)
+        if total <= limit:
+            return entries
+
+        print(f"\n{BOLD}Day totals {to_hhmm(total)}, over the"
+              f" {to_hhmm(limit)} limit -- Tisoware will refuse it:{OFF}")
+        print()
+        print_day_entries(entries, set())
+
+        print(f"\n  1 = trim {total - limit} min off the end of the day"
+              f" (down to {to_hhmm(limit)})")
+        print("  d = drop an entry")
+        print("  k = skip this day")
+        choice = ask("Choose [1/d/k]: ").lower()
+
+        if choice == "k":
+            return None
+
+        if choice == "1":
+            entries, notes = trim_from_end(entries, limit)
+            for note in notes:
+                print(f"  {note}")
+            continue
+
+        if choice == "d":
+            entries = drop_entry(entries)
+            continue
+
+        print("  please answer 1, d or k")
+
+
+def drop_entry(entries: list[LogEntry]) -> list[LogEntry]:
+    """Prompt for an index and remove it. Returns entries unchanged if the
+    answer is not a valid index."""
+    raw = ask("  index to drop: ")
+    if not raw.isdigit() or int(raw) >= len(entries):
+        print("  no such index")
+        return entries
+    dropped = entries[int(raw)]
+    print(f"  dropping {dropped.from_time}-{dropped.to_time}"
+          f" {dropped.comment}")
+    return entries[:int(raw)] + entries[int(raw) + 1:]
+
+
+def day_flags(entries: list[LogEntry]) -> list[str]:
+    """Repairs a day needs before it can be posted. Hour deviations are not
+    listed here -- they are reported as a signed figure by day_delta()."""
+    rows = sorted(entries, key=lambda e: to_minutes(e.from_time))
+    flags = []
+    if find_inverted(rows):
+        flags.append("backwards")
+    if find_overlaps(rows):
+        flags.append("overlap")
+    if not flags:
+        flags.append("clean")
+    return flags
+
+
+def day_delta(minutes: int) -> tuple[str, bool]:
+    """Signed deviation from a full day, and whether it is out of the
+    workable band: short of 8 h, or past the 10 h Tisoware refuses."""
+    diff = minutes - FULL_DAY_MINUTES
+    sign = "-" if diff < 0 else "+"
+    text = f"{sign}{to_hhmm(abs(diff))}"
+    bad = minutes < FULL_DAY_MINUTES or minutes > MAX_DAY_MINUTES
+    return text, bad
+
+
+def print_summary(grouped: dict[date, list[LogEntry]],
+                  dates: list[date],
+                  skipped: list[date] = (),
+                  emptied: list[date] = ()):
+    """One line per day: weekday, date, total, entry count, what it needs."""
+    notes = {d: "skipped" for d in skipped}
+    notes.update({d: "ignored" for d in emptied})
+
+    def row(label: str, total: str, count: str,
+            delta: str, needs: str,
+            delta_bad: bool = False, needs_bad: bool = False) -> str:
+        """Cells are padded before any colour is applied -- an escape
+        sequence counted as width would break the right edge."""
+        delta_cell = f"{delta:>8}"
+        needs_width = max(len(needs), HEADER_WIDTH - 36)
+        needs_cell = f"{needs:<{needs_width}}"
+        if delta_bad:
+            delta_cell = f"{RED}{delta_cell}{OFF}"
+        if needs_bad:
+            needs_cell = f"{RED}{needs_cell}{OFF}"
+        return (f"{label:10} {total:>6} {count:>7} {delta_cell}"
+                f"  {needs_cell}")
+
+    print()
+    print(row("Day", "Total", "Entries", "vs 8h", "Needs"))
+    print("-" * HEADER_WIDTH)
+
+    for d in sorted(set(dates) | set(notes)):
+        label = f"{d.strftime('%a')} {d.strftime('%d.%m')}"
+        if d in notes:
+            print(row(label, "-", "-", "-", notes[d], needs_bad=True))
+            continue
+        rows = grouped[d]
+        minutes = day_minutes(rows)
+        delta, bad = day_delta(minutes)
+        flags = day_flags(rows)
+        print(row(label, to_hhmm(minutes), str(len(rows)), delta,
+                  ", ".join(flags), delta_bad=bad,
+                  needs_bad=flags[0] != "clean"))
+
+    print("-" * HEADER_WIDTH)
+    total = sum(day_minutes(grouped[d]) for d in dates)
+    print(f"{len(dates)} day(s) to post, {to_hhmm(total)} total")
+
+    # Over the limit is the one deviation the server acts on, so name those
+    # days rather than leaving them as a red figure in the table.
+    over = [d for d in dates if day_minutes(grouped[d]) > MAX_DAY_MINUTES]
+    if over:
+        print(f"{RED}Over {to_hhmm(MAX_DAY_MINUTES)} and will be refused: "
+              + ", ".join(d.strftime("%d.%m") for d in over) + OFF)
+
+
 def find_overlaps(entries: list[LogEntry]) -> list[tuple[int, int]]:
     """Index pairs (i, j) in a start-sorted list where entry i runs past the
     start of entry j. Tisoware rejects these with "Die Buchung bis X
@@ -227,6 +558,114 @@ def print_day_entries(entries: list[LogEntry], flagged: set[int]):
         line = (f"  [{idx}] {e.from_time}-{e.to_time} ({span / 60:.2f}h) "
                 f"{e.project:20} {e.comment}")
         print(f"{RED}{line}{OFF}" if idx in flagged else line)
+
+
+def find_contained(entries: list[LogEntry]) -> list[tuple[int, int]]:
+    """Index pairs (outer, inner) where the inner entry lies entirely inside
+    the outer one -- typically a meeting logged while a longer task was still
+    running.
+
+    Neither align direction fits this case: shortening the outer entry throws
+    away the time *after* the inner one, and pushing the inner entry out to
+    the outer end would collapse it. Splitting the outer entry around the
+    inner one is the repair that keeps the real time. See split_around().
+    """
+    pairs = []
+    for i, outer in enumerate(entries):
+        outer_span = to_minutes(outer.to_time) - to_minutes(outer.from_time)
+        for j, inner in enumerate(entries):
+            if i == j:
+                continue
+            inner_span = to_minutes(inner.to_time) - to_minutes(inner.from_time)
+            if (to_minutes(outer.from_time) <= to_minutes(inner.from_time)
+                    and to_minutes(inner.to_time) <= to_minutes(outer.to_time)
+                    and outer_span > inner_span):
+                pairs.append((i, j))
+    return pairs
+
+
+def split_around(entries: list[LogEntry], outer: int,
+                 inner: int) -> tuple[list[LogEntry], list[str]]:
+    """Cut the enclosing entry in two so the inner entry sits between the
+    halves, keeping all of the enclosing entry's time except the minutes the
+    inner one occupies. A half of zero length is dropped rather than kept."""
+    o, n = entries[outer], entries[inner]
+    # Guard the precondition. Splitting around an entry that is not inside
+    # the outer one silently *extends* the outer entry to reach it, which
+    # would book time that was never worked.
+    if not (to_minutes(o.from_time) <= to_minutes(n.from_time)
+            and to_minutes(n.to_time) <= to_minutes(o.to_time)):
+        return entries, [f"cannot split [{outer}] {o.from_time}-{o.to_time}:"
+                         f" [{inner}] {n.from_time}-{n.to_time} is not"
+                         f" inside it"]
+
+    halves = [o._replace(to_time=n.from_time), o._replace(from_time=n.to_time)]
+    kept = [h for h in halves
+            if to_minutes(h.to_time) > to_minutes(h.from_time)]
+
+    notes = [f"[{outer}] {o.from_time}-{o.to_time} split around"
+             f" [{inner}] {n.from_time}-{n.to_time} -> "
+             + " + ".join(f"{h.from_time}-{h.to_time}" for h in kept)]
+    if len(kept) < len(halves):
+        notes.append(f"  one half was empty, {len(kept)} kept")
+
+    rest = [e for k, e in enumerate(entries) if k != outer]
+    return sorted(rest + kept, key=lambda e: to_minutes(e.from_time)), notes
+
+
+DAY_END_MINUTES = 24 * 60
+
+
+def move_after(entries: list[LogEntry], moving: int,
+               anchor: int) -> tuple[list[LogEntry], list[str]]:
+    """Relocate an entry whole, keeping its duration, so it starts when the
+    anchor entry ends.
+
+    align_later_start() moves only the start and leaves the end where it was,
+    which shortens the record and refuses outright when that would collapse
+    it. Moving keeps the length, so the day total is unchanged and the entry
+    can never come out backwards -- the minutes are relocated, not lost.
+    """
+    e, a = entries[moving], entries[anchor]
+    span = to_minutes(e.to_time) - to_minutes(e.from_time)
+    new_start = to_minutes(a.to_time)
+    new_end = new_start + span
+
+    if new_end > DAY_END_MINUTES:
+        return entries, [f"cannot move [{moving}]: {to_hhmm(new_start)}"
+                         f" + {span} min runs past midnight"]
+
+    moved = e._replace(from_time=to_hhmm(new_start), to_time=to_hhmm(new_end))
+    rest = [x for k, x in enumerate(entries) if k != moving]
+    notes = [f"[{moving}] {e.from_time}-{e.to_time} ->"
+             f" {moved.from_time}-{moved.to_time}"
+             f" (after [{anchor}] ending {a.to_time}, {span} min kept)"]
+    return sorted(rest + [moved], key=lambda x: to_minutes(x.from_time)), notes
+
+
+def move_entry(entries: list[LogEntry]) -> list[LogEntry]:
+    """Prompt for an entry and what to put it behind, then relocate it whole.
+    Returns entries unchanged if either answer is not a valid index."""
+    raw = ask("  index to move: ")
+    if not raw.isdigit() or int(raw) >= len(entries):
+        print("  no such index")
+        return entries
+    moving = int(raw)
+
+    raw = ask("  place it after index: ")
+    if not raw.isdigit() or int(raw) >= len(entries):
+        print("  no such index")
+        return entries
+    anchor = int(raw)
+
+    if anchor == moving:
+        print("  cannot place an entry after itself")
+        return entries
+
+    out, notes = move_after(entries, moving, anchor)
+    for note in notes:
+        print(f"  {note}")
+    return out
 
 
 def align_earlier_end(entries: list[LogEntry]) -> tuple[list[LogEntry], list[str]]:
@@ -269,10 +708,16 @@ def resolve_overlaps(entries: list[LogEntry]) -> Optional[list[LogEntry]]:
         if not overlaps:
             return entries
 
+        contained = find_contained(entries)
         flagged = {i for pair in overlaps for i in pair}
         print(f"\n{BOLD}{len(overlaps)} overlap(s) -- Tisoware will refuse"
               f" these:{OFF}")
         for i, j in overlaps:
+            if (i, j) in contained:
+                print(f"  {RED}[{i}] {entries[i].from_time}-"
+                      f"{entries[i].to_time} encloses [{j}]"
+                      f" {entries[j].from_time}-{entries[j].to_time}{OFF}")
+                continue
             cut = to_minutes(entries[i].to_time) - to_minutes(entries[j].from_time)
             print(f"  {RED}[{i}] ends {entries[i].to_time} but [{j}] starts"
                   f" {entries[j].from_time} ({cut} min){OFF}")
@@ -280,16 +725,31 @@ def resolve_overlaps(entries: list[LogEntry]) -> Optional[list[LogEntry]]:
         print_day_entries(entries, flagged)
 
         i, j = overlaps[0]
+        splittable = (i, j) in contained
         print(f"\n  1 = align down: end of the earlier entry"
               f" -> {entries[j].from_time} (shortens it)")
+        collapses = (to_minutes(entries[i].to_time)
+                     >= to_minutes(entries[j].to_time))
         print(f"  2 = align up:   start of the later entry"
-              f" -> {entries[i].to_time} (shortens it)")
+              f" -> {entries[i].to_time}"
+              f" ({'would collapse it' if collapses else 'shortens it'})")
+        if splittable:
+            halves, _ = split_around(entries, i, j)
+            kept = [h for h in halves if h.comment == entries[i].comment]
+            print(f"  s = split [{i}] around [{j}] -> "
+                  + " + ".join(f"{h.from_time}-{h.to_time}" for h in kept))
+        print("  m = move an entry whole, behind another (keeps its length)")
         print("  d = drop an entry")
-        print("  s = skip this day")
-        choice = ask("Choose [1/2/d/s]: ").lower()
+        print("  k = skip this day")
+        keys = "1/2/s/m/d/k" if splittable else "1/2/m/d/k"
+        choice = ask(f"Choose [{keys}]: ").lower()
 
-        if choice == "s":
+        if choice == "k":
             return None
+
+        if choice == "m":
+            entries = move_entry(entries)
+            continue
 
         if choice in ("1", "2"):
             entries, notes = (align_earlier_end(entries) if choice == "1"
@@ -298,18 +758,17 @@ def resolve_overlaps(entries: list[LogEntry]) -> Optional[list[LogEntry]]:
                 print(f"  {note}")
             continue
 
-        if choice == "d":
-            raw = ask("  index to drop: ")
-            if not raw.isdigit() or int(raw) >= len(entries):
-                print("  no such index")
-                continue
-            dropped = entries[int(raw)]
-            print(f"  dropping {dropped.from_time}-{dropped.to_time}"
-                  f" {dropped.comment}")
-            entries = entries[:int(raw)] + entries[int(raw) + 1:]
+        if choice == "s" and splittable:
+            entries, notes = split_around(entries, i, j)
+            for note in notes:
+                print(f"  {note}")
             continue
 
-        print("  please answer 1, 2, d or s")
+        if choice == "d":
+            entries = drop_entry(entries)
+            continue
+
+        print(f"  please answer {keys.replace('/', ', ')}")
 
 
 def get_activity_pattern(project: str) -> str:
@@ -336,7 +795,19 @@ def post_bookings_for_date(
     print(format_day_header(date_str, len(entries), logged_minutes))
     print('=' * HEADER_WIDTH)
 
+    # Backwards entries first: they distort the day total and would make the
+    # overlap comparison meaningless.
+    entries = resolve_inverted(entries)
+    if entries is None:
+        print("Day skipped")
+        return False
+
     entries = resolve_overlaps(entries)
+    if entries is None:
+        print("Day skipped")
+        return False
+
+    entries = resolve_over_limit(entries)
     if entries is None:
         print("Day skipped")
         return False
@@ -457,23 +928,73 @@ def main(
     start_date: Optional[date] = None,
     dry_run: bool = False,
     url: str = PROD_URL,
+    end_date: Optional[date] = None,
+    skip_dates: frozenset = frozenset(),
+    summary: bool = False,
 ):
-    """Parse log and post Buchungskorrektur entries to Tisoware."""
-    print(f"Reading log from {log_path}...")
-    entries = parse_log_file(log_path)
+    """Parse log or tasks.json and post Buchungskorrektur entries."""
+    print(f"Reading entries from {log_path}...")
+    raw = load_entries(log_path)
+    entries = drop_ignored(raw)
 
     if not entries:
-        print("No entries found in log")
+        print("No entries found")
         return
 
+    if len(entries) != len(raw):
+        names = ", ".join(sorted({e.task for e in raw
+                                  if e.task in IGNORED_TASKS}))
+        print(f"Ignoring {len(raw) - len(entries)} entries from: {names}")
+
     grouped = group_by_date(entries)
+    # Dates that had rows but lost every one of them to IGNORED_TASKS. They
+    # are gone from grouped, so carry them separately to report below.
+    emptied = sorted(set(group_by_date(raw)) - set(grouped))
 
     if start_date is None:
         start_date = min(grouped.keys())
 
-    dates_to_post = sorted([d for d in grouped.keys() if d >= start_date])
+    dates_to_post = sorted(d for d in grouped
+                           if d >= start_date
+                           and (end_date is None or d <= end_date)
+                           and d not in skip_dates)
+
+    bound = f" to {end_date}" if end_date else ""
     print(f"Found {len(entries)} entries across {len(grouped)} dates")
-    print(f"Will post {len(dates_to_post)} date(s) starting from {start_date}")
+    print(f"Will post {len(dates_to_post)} date(s) from {start_date}{bound}")
+
+    # Every requested skip in range, whether or not it holds entries -- a
+    # sick day with nothing logged still belongs in the report.
+    skipped = sorted(d for d in skip_dates
+                     if d >= start_date
+                     and (end_date is None or d <= end_date))
+    if skipped and not summary:
+        print("Skipping by request: "
+              + ", ".join(d.strftime("%d.%m") for d in skipped))
+
+    # Only the entries actually in scope need a project; complain before
+    # anything is sent rather than booking them somewhere plausible.
+    in_scope = [e for d in dates_to_post for e in grouped[d]]
+    unmapped = find_unmapped(in_scope)
+    if unmapped:
+        print(f"\n{RED}No project mapping for:{OFF}")
+        for name, count in sorted(unmapped.items()):
+            print(f"  {name!r} ({count} entries)")
+        print("\nAdd them to TASK_PROJECT_MAP (or IGNORED_TASKS) and re-run.")
+        return
+
+    in_range = [d for d in emptied
+                if d >= start_date
+                and (end_date is None or d <= end_date)
+                and d not in skip_dates]
+    if in_range and not summary:
+        print(f"{RED}Nothing left to post on: "
+              + ", ".join(d.strftime("%d.%m") for d in in_range)
+              + " -- every entry was ignored" + OFF)
+
+    if summary:
+        print_summary(grouped, dates_to_post, skipped, in_range)
+        return
 
     if dry_run:
         print("\n[DRY-RUN] Showing entries without posting...")
@@ -501,15 +1022,23 @@ def main(
 
     success_count = 0
     overlap_days = []
+    inverted_days = []
+    over_limit_days = []
     saved_days = []
     aborted_on = None
     for position, d in enumerate(dates_to_post):
         if dry_run:
             rows = sorted(grouped[d], key=lambda e: to_minutes(e.from_time))
             overlaps = find_overlaps(rows)
-            flagged = {i for pair in overlaps for i in pair}
+            inverted = find_inverted(rows)
+            flagged = {i for pair in overlaps for i in pair} | set(inverted)
             if overlaps:
                 overlap_days.append(d)
+            if inverted:
+                inverted_days.append(d)
+            total = day_minutes(rows)
+            if total > MAX_DAY_MINUTES:
+                over_limit_days.append(d)
 
             print(f"\n{'=' * HEADER_WIDTH}")
             print(format_day_header(d.strftime('%d.%m.%Y'), len(rows),
@@ -526,9 +1055,16 @@ def main(
                 print(f"{RED}{line}{OFF}" if idx in flagged else line)
                 print(f"    Comment: {entry.comment!r}")
 
+            for i in inverted:
+                print(f"  {RED}BACKWARDS: [{i}] {rows[i].from_time}-"
+                      f"{rows[i].to_time} ends before it starts{OFF}")
             for i, j in overlaps:
                 print(f"  {RED}OVERLAP: ends {rows[i].to_time} but next starts"
                       f" {rows[j].from_time} -- Tisoware will refuse this{OFF}")
+            if total > MAX_DAY_MINUTES:
+                print(f"  {RED}OVER LIMIT: {to_hhmm(total)} exceeds"
+                      f" {to_hhmm(MAX_DAY_MINUTES)}"
+                      f" -- Tisoware will refuse this{OFF}")
             success_count += 1
         else:
             try:
@@ -570,34 +1106,61 @@ def main(
                                 - to_minutes(entry.from_time)) / 60
 
         print(f"Total hours across all days: {total_hours:.1f}h")
-        if overlap_days:
-            days = ", ".join(d.strftime("%d.%m") for d in overlap_days)
-            print(f"{RED}Overlaps on: {days}"
-                  f" -- these need 1/2/d/s on the real run{OFF}")
+        for label, days, keys in (
+            ("Overlaps", overlap_days, "1/2/d/s"),
+            ("Backwards entries", inverted_days, "1/d/s"),
+            ("Over 10h", over_limit_days, "1/d/s"),
+        ):
+            if days:
+                shown = ", ".join(d.strftime("%d.%m") for d in days)
+                print(f"{RED}{label} on: {shown}"
+                      f" -- these need {keys} on the real run{OFF}")
 
 
 if __name__ == "__main__":
     import argparse
+    def a_date(s):
+        return datetime.strptime(s, "%d.%m.%Y").date()
+
     parser = argparse.ArgumentParser(
-        description="Post Buchungskorrektur entries from markdown log to Tisoware"
+        description="Post Buchungskorrektur entries to Tisoware from a ttplus"
+                    " tasks.json database or a markdown log"
     )
     parser.add_argument(
         "--log",
         type=Path,
         default=Path.home() / "ttplus" / "ml-test" / "2026-July" / "2026-July.md",
-        help="Path to markdown log file",
+        help="Path to a tasks.json database (.json) or a markdown log",
     )
     parser.add_argument(
         "--from",
-        type=lambda s: datetime.strptime(s, "%d.%m.%Y").date(),
+        type=a_date,
         dest="start_date",
         default=None,
         help="Start date (dd.mm.yyyy), default: first entry",
     )
     parser.add_argument(
+        "--to",
+        type=a_date,
+        dest="end_date",
+        default=None,
+        help="Last date (dd.mm.yyyy), default: last entry",
+    )
+    parser.add_argument(
+        "--skip",
+        type=lambda s: frozenset(a_date(p) for p in s.split(",") if p.strip()),
+        default=frozenset(),
+        help="Dates to leave out, comma separated (dd.mm.yyyy), e.g. sick leave",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Preview and exit without saving",
+    )
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="One line per day (total, entries, what it needs) and exit",
     )
     parser.add_argument(
         "--url",
@@ -607,7 +1170,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     try:
-        main(args.log, args.start_date, args.dry_run, args.url)
+        main(args.log, args.start_date, args.dry_run, args.url,
+             args.end_date, args.skip, args.summary)
     except (Aborted, KeyboardInterrupt):
         # Anything the day loop did not already report (Ctrl-C at the login
         # prompt, or between days).
