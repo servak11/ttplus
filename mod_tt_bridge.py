@@ -101,11 +101,12 @@ def browse_data(
             """
             ))
 
-    from config import u_r, p_d
+    from tiso_credentials import load_credentials
+    user, password = load_credentials()
 
     # Find the username and password fields and enter credentials
-    E("Uname").send_keys(u_r[:len(u_r)-3])
-    E("PWD").send_keys(p_d[:len(p_d)-3])
+    E("Uname").send_keys(user)
+    E("PWD").send_keys(password)
     # .click() generates error in headless mode
     # selenium.common.exceptions.ElementClickInterceptedException:
     # button is not clickable at point (250, 419)

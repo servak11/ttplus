@@ -210,7 +210,8 @@ class Tiso(MyBrowser):
             print ("Already Logged in !")
             return
 
-        from config import u_r, p_d
+        from tiso_credentials import load_credentials
+        user, password = load_credentials()
 
         # 28.01.2026> the Tiso interface changed to more fancy one
         # Even though the <input id="Uname"> is in the DOM,
@@ -220,8 +221,8 @@ class Tiso(MyBrowser):
         )
 
         # Find the username and password fields and enter credentials
-        self.E("Uname").send_keys(u_r[:len(u_r)-3])
-        self.E("PWD").send_keys(p_d[:len(p_d)-3])
+        self.E("Uname").send_keys(user)
+        self.E("PWD").send_keys(password)
 
         # .click() generates error in headless mode
         # selenium.common.exceptions.ElementClickInterceptedException:
@@ -330,9 +331,12 @@ class Tiso(MyBrowser):
 
 
         USE_TO_DATE = True
-        if USE_TO_DATE: # debug date - once the last date did not work
+        if USE_TO_DATE:
+            # Was hardcoded to day=30, which silently dropped the 31st in a
+            # 31-day month (and raises in February). Read up to today: the
+            # sheet cannot hold anything later anyway.
             todate = get_ts(
-                datetime.today().replace(day=31),
+                datetime.today(),
                 fmt = FMT_DATE
             )
 
