@@ -94,6 +94,7 @@ TASK_PROJECT_MAP = {
     "Refactor MiGA 3.0rc": "9300_2026",
     "Timekeeping": "Allg. Aufgaben 2026",
     "coffee tool": "9300_2026",
+    "NCR #19523 communiction switch RBP-CAN": "9300_2026"
 }
 
 # Placeholder rows entered on Thursday so the reported work percentage came
@@ -972,8 +973,18 @@ def main(
         print("Skipping by request: "
               + ", ".join(d.strftime("%d.%m") for d in skipped))
 
-    # Only the entries actually in scope need a project; complain before
-    # anything is sent rather than booking them somewhere plausible.
+    # Only the entries actually in scope need a project;
+    # complain before anything is sent
+    # rather than booking them somewhere plausible.
+    #
+    # Meaning:
+    # This is a double list comprehension that flattens the entries for all selected dates.
+    #
+    # Equivalent to:
+    # in_scope = []
+    # for d in dates_to_post:   # outer cycle first
+    #   for e in grouped[d]:    # inner cycle second
+    #     in_scope.append(e)    # append operation automatically done by the list comprehension
     in_scope = [e for d in dates_to_post for e in grouped[d]]
     unmapped = find_unmapped(in_scope)
     if unmapped:
