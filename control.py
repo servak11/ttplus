@@ -142,6 +142,7 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter import PhotoImage
+from tkinter import messagebox
 
 import const
 
@@ -519,18 +520,39 @@ class TTPlusController( ):
     # Delete the selected task from Table 1 and the database
     def delete_task(self):
         selected_item = self.view.table1.selection()
-        if selected_item:
-            task_id = self.view.table1.item(selected_item, "values")[0]
-            # Remove from database
-            self.database["work_tasks"] = [task for task in self.database["work_tasks"] if task["Task ID"] != task_id]
-            if task_id in self.database["task_details"]:
-                del self.database["task_details"][task_id]
-            #db.save_data(database)
-            # Remove from Table 1
-            self.view.table1.delete(selected_item)
-            # Clear Table 2
-            for row in self.view.table2.get_children():
-                self.view.table2.delete(row)
+        if not selected_item:
+            return
+        task_id = self.view.table1.item(selected_item, "values")[0]
+
+        # the grey "new task ..." row is not in the database, and deleting it
+        # would leave no row to start the next task from
+        if task_id not in self.database["work_tasks"]:
+            self.view.status_bar.s_set("Nothing to delete, this is the new task row")
+            return
+
+        task_name = self.database["work_tasks"][task_id].get("tnm", "")
+        n_details = len(self.database["task_details"].get(task_id, []))
+        if not messagebox.askyesno(
+            "Delete task",
+            f'Delete task "{task_name}" and its {n_details} detail(s)?\n'
+            "This cannot be undone."
+        ):
+            return
+
+        # a task detail picked up for a move cannot be dropped once its task is gone
+        if self._move_src is not None and self._move_src[0] == task_id:
+            self._move_src = None
+
+        del self.database["work_tasks"][task_id]
+        self.database["task_details"].pop(task_id, None)
+        self._note_dirty = True
+
+        self.cur_selected_item = None
+        self.view.table1.delete(selected_item)
+        self.view.table2.clear_table()
+        self.view.tde.reset_editor()
+        self.view.update_tools_menu()
+        self.view.status_bar.s_set("Deleted task", task_id, task_name)
 
     # ── Move Task Detail ──────────────────────────────────────────────────────
     # A move is a two step action: the detail is picked up in its original task,
@@ -670,6 +692,11 @@ class TTPlusController( ):
         self.view.tde.stop_clock()
         selected_item = self.view.table1.selection()
         #print("selected_item list = ", selected_item)
+        if not selected_item:
+            # the selected row was just deleted, there is nothing to load
+            self.cur_selected_item = None
+            self.view.update_tools_menu()
+            return
         if self.cur_selected_item == selected_item[0]:
             # selected item clicked again, nothing to do
             return

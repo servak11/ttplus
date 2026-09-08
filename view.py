@@ -2,7 +2,6 @@ import os
 from datetime import datetime
 import tkinter as tk
 from tkinter import ttk
-from tkinter import messagebox
 
 from config import APP_TITLE, THEMES
 from mod_db import Database
@@ -29,6 +28,7 @@ class TTPlusScreen(tk.Frame):
         # --- UI Element References for Redrawing ---
         self.frames_to_color = []
         self.entries_to_color = []
+        self.buttons_to_color = []
 
         # This is my controller!
         # Pass reference to the view so it can populate the tables after initialization
@@ -77,13 +77,19 @@ class TTPlusScreen(tk.Frame):
 
 
         # Delete Button
-        delete_button = tk.Button(
+        # plain U+1F5D1 without the U+FE0F variation selector: Tk has no glyph
+        # for the selector and draws it as a second, empty cell, which made the
+        # button twice as wide with the icon pushed to the left
+        self.delete_button = tk.Button(
             self.frame_task_editor,
-            text="🗑️",        # or "✖", "❌", "⌫"
+            text="\N{WASTEBASKET}",
             font=("Tahoma", 11),
+            relief="flat",
+            bd=0,
             command=self.controller.delete_task
         )
-        delete_button.pack(side="left")
+        self.delete_button.pack(side="left")
+        self.buttons_to_color.append(self.delete_button)
 
 
         # Table 2 (Task Details)
@@ -194,6 +200,15 @@ class TTPlusScreen(tk.Frame):
                 bg=colors["bg_input"],
                 fg=colors["fg_main"],
                 insertbackground=colors["fg_main"] # Text caret color
+            )
+
+        for button in self.buttons_to_color:
+            button.configure(
+                bg=colors["bg_input"],
+                fg=colors["fg_main"],
+                activebackground=colors["accent"],
+                activeforeground=colors["fg_main"],
+                highlightbackground=colors["bg_main"]
             )
 
         # 3. Update TTK Style Definitions
