@@ -194,7 +194,7 @@ class TaskIdCollisionTest(unittest.TestCase):
         c = make_controller()
         with SameSecondPatch(c):
             # startup placeholder (as populate_table1 would do)
-            control.task_placeholder_id = c.add_new_task_placeholder()
+            c.task_placeholder_id = c.add_new_task_placeholder()
 
             placeholder_iid = c.view.table1.get_children()[0]
             c.view.table1.selection_set(placeholder_iid)

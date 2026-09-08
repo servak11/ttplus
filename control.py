@@ -196,7 +196,7 @@ class TTPlusController( ):
 
         #settings = Database("settings.json").load_data()
 
-        self.task_placeholder_id = "00000"
+        self.task_placeholder_id = None
         self.cur_selected_item = None
 
         # pending "Move Task Detail" action, see move_task_detail()
@@ -239,8 +239,7 @@ class TTPlusController( ):
             self.database["work_tasks"] = {}
         self.view.table1.populate(self.database["work_tasks"])
         # !!! always keep track of newly created task otherwise impossible to save later
-        global task_placeholder_id
-        task_placeholder_id = self.add_new_task_placeholder()
+        self.task_placeholder_id = self.add_new_task_placeholder()
 
     def generate_task_id(self):
         """Generate a unique Task ID based on the current timestamp."""
@@ -388,11 +387,10 @@ class TTPlusController( ):
                 if create_new_task: # entry did not exist
                     ############### use placeholder
                     # this was a placeholder, convert it into a real task
-                    global task_placeholder_id
-                    task_id = self.generate_short_task_id(task_placeholder_id)
+                    task_id = self.generate_short_task_id(self.task_placeholder_id)
                     self.view.status_bar.s_set("add new task",task_id)
                     self.database["work_tasks"][task_id] = {
-                                "fti": task_placeholder_id,
+                                "fti": self.task_placeholder_id,
                                 "sti": task_id,
                                 "tnm": new_name,
                                 "twt": "0",
@@ -401,7 +399,7 @@ class TTPlusController( ):
                     self.database["task_details"][task_id] = []
 
                     # create new task id and use it for the placeholder
-                    task_placeholder_id = self.add_new_task_placeholder()
+                    self.task_placeholder_id = self.add_new_task_placeholder()
                 else:
                     ############### update the existing dictionary entry
                     #if task_dict["sti"] == task_id:
@@ -907,7 +905,6 @@ class TTPlusController( ):
         except (IndexError, KeyError, TypeError):
             task_name = ""
 
-        global note_shown
         if not self.note_shown or 1:
             self.note_shown = True # do not start the server again if it was already started
             self.note_server.show_note(
