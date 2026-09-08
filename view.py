@@ -136,6 +136,19 @@ class TTPlusScreen(tk.Frame):
 
         menu_bar.add_command(label="Project Manager", command=go_back_cleanly)
 
+        # --- Tools Cascading Menu ---
+        self.tools_menu = tk.Menu(menu_bar, tearoff=0)
+        self.tools_menu.add_command(
+            label="Move Task Detail",
+            command=self.controller.move_task_detail
+        )
+        self.tools_menu.add_command(
+            label="Cancel Move",
+            command=self.controller.cancel_move_task_detail
+        )
+        menu_bar.add_cascade(label="Tools", menu=self.tools_menu)
+        self.update_tools_menu()
+
         # --- Theme Switcher Cascading Menu ---
         theme_menu = tk.Menu(menu_bar, tearoff=0)
         theme_menu.add_command(
@@ -147,6 +160,16 @@ class TTPlusScreen(tk.Frame):
             command=lambda: self.apply_theme("bright")
         )
         menu_bar.add_cascade(label="🎨 Themes", menu=theme_menu)
+
+    def update_tools_menu(self):
+        """Sync the Tools menu with the controller's pending move state."""
+        label, enabled = self.controller.move_menu_state()
+        self.tools_menu.entryconfigure(
+            0, label=label, state="normal" if enabled else "disabled"
+        )
+        self.tools_menu.entryconfigure(
+            1, state="normal" if self.controller.move_armed() else "disabled"
+        )
 
     def apply_theme(self, theme_name):
         """

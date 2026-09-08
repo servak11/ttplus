@@ -199,6 +199,9 @@ class TTPlusController( ):
         self.task_placeholder_id = "00000"
         self.cur_selected_item = None
 
+        # pending "Move Task Detail" action, see move_task_detail()
+        self._move_src = None
+
         # ── Conditional DB save state ─────────────────────────────────────────────────
         self._note_dirty = False
         self._last_save_time = _time.time()
@@ -532,6 +535,116 @@ class TTPlusController( ):
             for row in self.view.table2.get_children():
                 self.view.table2.delete(row)
 
+    # ── Move Task Detail ──────────────────────────────────────────────────────
+    # A move is a two step action: the detail is picked up in its original task,
+    # then dropped into whichever task is selected afterwards. While the move is
+    # armed, _move_src holds (source task id, the detail dict itself). The dict
+    # is kept by reference rather than by index so the pending move survives
+    # edits that shift positions in the source list.
+
+    def move_armed(self):
+        """True while a task detail is picked up and waiting to be dropped."""
+        return self._move_src is not None
+
+    def _selected_task_id(self):
+        selection = self.view.table1.selection()
+        if not selection:
+            return None
+        return self.view.table1.item(selection[0], "values")[0]
+
+    def _selected_detail(self):
+        """
+        Return (task_id, detail dict) for the row selected in Table 2.
+
+        Returns (None, None) for the grey placeholder row: it is not a database
+        entry yet and therefore cannot be moved.
+        """
+        selection = self.view.table2.selection()
+        if not selection:
+            return None, None
+        task_id = self._selected_task_id()
+        detail_list = self.database["task_details"].get(task_id)
+        if not detail_list:
+            return None, None
+        detail_index = self.view.table2.index(selection[0])
+        if not 0 <= detail_index < len(detail_list):
+            return None, None
+        return task_id, detail_list[detail_index]
+
+    def _move_target_ok(self, dst_task_id):
+        src_task_id = self._move_src[0]
+        return dst_task_id != src_task_id and dst_task_id in self.database["work_tasks"]
+
+    def move_menu_state(self):
+        """Return (label, enabled) for the Tools > Move Task Detail entry."""
+        if self._move_src is None:
+            _, detail = self._selected_detail()
+            return "Move Task Detail", detail is not None
+        if not self._move_target_ok(self._selected_task_id()):
+            # still inside the original parent task, or on the new task
+            # placeholder - there is nowhere to drop the detail
+            return "Move Task Detail", False
+        return "Move Here", True
+
+    def move_task_detail(self):
+        """Pick up the selected task detail, or drop it into the selected task."""
+        if self._move_src is None:
+            task_id, detail = self._selected_detail()
+            if detail is None:
+                return
+            self._move_src = (task_id, detail)
+            self.view.status_bar.s_set(
+                "Move: select the target task, then Tools > Move Here"
+            )
+        else:
+            self._drop_task_detail()
+        self.view.update_tools_menu()
+
+    def cancel_move_task_detail(self):
+        if self._move_src is None:
+            return
+        self._move_src = None
+        self.view.status_bar.s_set("Move cancelled")
+        self.view.update_tools_menu()
+
+    def _drop_task_detail(self):
+        src_task_id, detail = self._move_src
+        dst_task_id = self._selected_task_id()
+        if not self._move_target_ok(dst_task_id):
+            return
+
+        src_list = self.database["task_details"].get(src_task_id, [])
+        for i, d in enumerate(src_list):
+            if d is detail:
+                src_list.pop(i)
+                break
+
+        dst_list = self.database["task_details"].setdefault(dst_task_id, [])
+        dst_list.insert(self._sorted_insert_index(dst_list, detail), detail)
+
+        self._move_src = None
+        self._note_dirty = True
+        self.populate_table2(dst_list)
+        self.view.status_bar.s_set(
+            "Moved detail", str(detail["What was done"])[:40],
+            "from task", src_task_id, "to", dst_task_id
+        )
+
+    @staticmethod
+    def _sorted_insert_index(detail_list, detail):
+        """
+        Index at which detail keeps the destination list in date order.
+
+        Timestamps are YYYYMMDDHHMMSS strings, so plain string comparison is
+        chronological. An empty list and a detail younger than everything
+        already present both land at the end of the list.
+        """
+        start_time = detail["Start Time"]
+        for i, d in enumerate(detail_list):
+            if d["Start Time"] > start_time:
+                return i
+        return len(detail_list)
+
     # force select a task in table 1
     # we can only select anything by first selecting the task
     # @param task_id id of the task to select in the table1
@@ -585,6 +698,7 @@ class TTPlusController( ):
             # detail_list is the list of dictionaries
             #print(" -> assert ",short_task_id,"==",task["sti"])
             self.populate_table2(detail_list)
+        self.view.update_tools_menu()
 
     def calculate_total_work_time(self, task_id):
         """
@@ -657,6 +771,7 @@ class TTPlusController( ):
 
         # check if selection was done
         selected_detail = self.view.table2.selection()
+        self.view.update_tools_menu()
         if not selected_detail:
             # if no selection, no action!
             # this can happen when table populated but no selection done
