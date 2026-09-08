@@ -247,11 +247,13 @@ class TTPlusScreen(tk.Frame):
 
         # Update text item tags inside the tables dynamically
         gray_color = "#888888" if theme_name == "dark" else "#555555"
-        blue_color = "#4a90e2" if theme_name == "dark" else "#106ba3"
 
         for table in (self.table1, self.table2):
             table.tag_configure("grey", foreground=gray_color)
-            table.tag_configure("blue", foreground=blue_color)
+            table.tag_configure("blue", foreground=colors["link"])
+
+        # 4. The Detail Editor colours its own controls
+        self.tde.apply_theme(colors)
 
     def apply_custom_styles(self):
         style = ttk.Style()

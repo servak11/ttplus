@@ -50,6 +50,9 @@ class DateLabel(tk.Frame):
         self._date = datetime.now()
         self.spinbox = None
         self.spin_var = tk.IntVar(value=0)
+        # colours of the active theme, kept so the spinbox can be coloured
+        # at the moment it is created by toggle_spinbox()
+        self._colors = None
         # Create the control containing the date display and controls
         self._create_datelabel()
 
@@ -83,6 +86,41 @@ class DateLabel(tk.Frame):
         self.date_changed = False
 
         self.tooltip = ToolTip(self.lock_button, "Lock")  # Attach Tooltip
+
+    def apply_theme(self, colors):
+        """Apply the given theme colours to the date label, lock button and spinbox."""
+        self._colors = colors
+        self.configure(bg=colors["bg_main"])
+        self.frm.configure(bg=colors["bg_main"])
+        self.date_label.configure(
+            bg=colors["bg_main"],
+            fg=colors["fg_main"],
+            disabledforeground=colors["fg_muted"]
+        )
+        self.lock_button.configure(
+            bg=colors["bg_input"],
+            fg=colors["fg_main"],
+            activebackground=colors["accent"],
+            activeforeground=colors["fg_main"],
+            disabledforeground=colors["fg_muted"],
+            highlightbackground=colors["bg_main"]
+        )
+        self._theme_spinbox()
+
+    def _theme_spinbox(self):
+        """Colour the day offset spinbox, which only exists while unlocked."""
+        if self.spinbox is None or self._colors is None:
+            return
+        c = self._colors
+        self.spinbox.configure(
+            bg=c["bg_input"],
+            fg=c["fg_main"],
+            buttonbackground=c["tree_header"],
+            insertbackground=c["fg_main"],
+            selectbackground=c["accent"],
+            selectforeground=c["fg_main"],
+            highlightbackground=c["bg_main"]
+        )
 
     def reset(self):
         """ Method to Reset the control needed if we change to a new task detail"""
@@ -128,6 +166,7 @@ class DateLabel(tk.Frame):
                 from_=-60, to=60, width=4,
                 textvariable=self.spin_var,
                 command=self._update_date)
+            self._theme_spinbox()
             self.spinbox.pack(side=tk.LEFT, padx=5)
             self.lock_button.config(relief=tk.SUNKEN)  # Set button to "pressed"
 

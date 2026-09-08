@@ -50,6 +50,8 @@ class TaskDetailEditor(tk.LabelFrame):
         self.d1 = None
         self.count_time = False
         self.note_loaded = False
+        # colour used for hyperlinks and ticket numbers, replaced by apply_theme
+        self._link_color = "blue"
 
         # Bind events for all controls
         # Note. (add="+") is used to prevent overwrite of TimeSpinControl validation
@@ -213,7 +215,7 @@ class TaskDetailEditor(tk.LabelFrame):
             tg="hyperlink"
             #print(f"create {tg} for ({tag_start}, {tag_end}) -> {match}")
             self.notes.tag_add(tg, tag_start, tag_end)
-            self.notes.tag_configure(tg, foreground="blue", underline=True)
+            self.notes.tag_configure(tg, foreground=self._link_color, underline=True)
             self.notes.tag_bind(tg, "<Button-1>", self._open_link)
         #print(f"Converted to {tg}: {count_links} links")
 
@@ -233,7 +235,7 @@ class TaskDetailEditor(tk.LabelFrame):
             tag_name = f"ticket_{ticket_number}"
             #print(f"create {tag_name} for ({tag_start}, {tag_end}) -> {match}")
             self.notes.tag_add(tag_name, tag_start, tag_end)
-            self.notes.tag_configure(tag_name, foreground="blue", underline=True)
+            self.notes.tag_configure(tag_name, foreground=self._link_color, underline=True)
 
             # Bind a closure with ticket-specific URL
             def handler(event, ticket_number=ticket_number):
@@ -261,6 +263,46 @@ class TaskDetailEditor(tk.LabelFrame):
         content = self.notes.get("1.0", tk.END)
         self._tag_hyperlink_references(content)
         self._tag_issue_references(content)
+
+    def apply_theme(self, colors):
+        """
+        Apply the given theme colours to the editor and every control inside it.
+
+        Called by TTPlusScreen.apply_theme(), so the editor follows the dark or
+        bright theme together with the rest of the window.
+        """
+        self._link_color = colors["link"]
+
+        # the LabelFrame itself, fg is the "Detail Editor" caption
+        self.configure(bg=colors["bg_main"], fg=colors["fg_muted"])
+        self.first_line.configure(bg=colors["bg_main"])
+        self.second_line.configure(bg=colors["bg_main"])
+
+        self.task_detail.configure(
+            bg=colors["bg_input"],
+            fg=colors["fg_main"],
+            insertbackground=colors["fg_main"],
+            selectbackground=colors["accent"],
+            selectforeground=colors["fg_main"],
+            disabledbackground=colors["bg_main"],
+            disabledforeground=colors["fg_muted"],
+            highlightbackground=colors["bg_main"]
+        )
+        self.notes.configure(
+            bg=colors["bg_input"],
+            fg=colors["fg_main"],
+            insertbackground=colors["fg_main"],
+            selectbackground=colors["accent"],
+            selectforeground=colors["fg_main"],
+            highlightbackground=colors["bg_main"]
+        )
+
+        self.date_control.apply_theme(colors)
+        TimeSpinControl.apply_theme(colors)
+
+        # links already on screen keep the old colour until their tags are
+        # rebuilt with the new one
+        self._detect_and_tag_links()
 
     def set_callback(self, update_task_details_method):
         self.callback = update_task_details_method

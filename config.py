@@ -26,6 +26,7 @@ THEMES = {
         "accent": "#1f538d",        # Active button/highlight
         "accent_hover": "#14375e",  # Hover state
         "tree_header": "#3a3a3a",   # Table header back
+        "link": "#4a90e2",          # Hyperlink / ticket reference text
     },
     "bright": {
         "bg_main": "#f5f5f5",       # Crisp light background
@@ -36,5 +37,6 @@ THEMES = {
         "accent": "#007acc",        # Vibrant blue interactive elements
         "accent_hover": "#005999",  # Active blue hover
         "tree_header": "#e1e1e1",   # Light table header back
+        "link": "#106ba3",          # Hyperlink / ticket reference text
     }
 }

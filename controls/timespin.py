@@ -22,6 +22,11 @@ Key Features:
 import tkinter as tk
 from tkinter import ttk
 
+# ttk widgets take their colours from a named style, not from .configure(bg=...),
+# so every TimeSpinControl shares this one style and apply_theme() recolours it
+STYLE_NAME = "Time.TSpinbox"
+
+
 class TimeSpinControl(ttk.Spinbox):
     """A specialized Spinbox control for time input (hours/minutes).
 
@@ -66,12 +71,35 @@ class TimeSpinControl(ttk.Spinbox):
             justify = "center",
             exportselection = 0,
             font    = ("Verdana", 12),
-            background = "lightblue"
+            style   = STYLE_NAME
         )
 
         # Bind events for proper handling
         self.bind("<FocusOut>", self._on_focus_out)
         self.bind("<KeyRelease>", self._on_key_release)
+
+    @staticmethod
+    def apply_theme(colors):
+        """Recolour the style shared by every TimeSpinControl."""
+        style = ttk.Style()
+        style.configure(
+            STYLE_NAME,
+            fieldbackground = colors["bg_input"],
+            background      = colors["tree_header"],   # the up/down arrow buttons
+            foreground      = colors["fg_main"],
+            arrowcolor      = colors["fg_main"],
+            insertcolor     = colors["fg_main"],
+            selectbackground= colors["accent"],
+            selectforeground= colors["fg_main"],
+            bordercolor     = colors["bg_main"]
+        )
+        style.map(
+            STYLE_NAME,
+            fieldbackground = [("disabled", colors["bg_main"])],
+            foreground      = [("disabled", colors["fg_muted"])],
+            arrowcolor      = [("disabled", colors["fg_muted"])],
+            background      = [("active", colors["accent"])]
+        )
 
 
     def _on_focus_out(self, event):
