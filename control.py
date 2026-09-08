@@ -192,7 +192,6 @@ class TTPlusController( ):
         self.note_server.set_database(self.database)
 
         self.note_server.register_select_callback(self.on_kanban_select)
-        self.note_shown = False
 
         #settings = Database("settings.json").load_data()
 
@@ -905,17 +904,15 @@ class TTPlusController( ):
         except (IndexError, KeyError, TypeError):
             task_name = ""
 
-        if not self.note_shown or 1:
-            self.note_shown = True # do not start the server again if it was already started
-            self.note_server.show_note(
-                note_text = self.view.tde.get_note(),
-                meta = {
-                    "project": task_name,
-                    "task":    self.view.tde.get_name() if hasattr(self.view.tde, "get_name") else "",
-                    "start":   self.view.tde.get_start_time(),
-                    "end":     self.view.tde.get_end_time(),
-                }
-            )
+        self.note_server.show_note(
+            note_text = self.view.tde.get_note(),
+            meta = {
+                "project": task_name,
+                "task":    self.view.tde.get_name() if hasattr(self.view.tde, "get_name") else "",
+                "start":   self.view.tde.get_start_time(),
+                "end":     self.view.tde.get_end_time(),
+            }
+        )
 
 
     def tt_test_action(self):
