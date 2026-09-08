@@ -718,14 +718,16 @@ class TTPlusController( ):
         total_minutes = 0
         for detail in detail_list:
             try:
-                tss = self.get_dt(detail["Start Time"])
-                tse = self.get_dt(detail["End Time"])
+                tss = get_dt(detail["Start Time"])
+                tse = get_dt(detail["End Time"])
                 delta = tse - tss
                 mins = int(delta.total_seconds()) // 60
                 if mins > 0:
                     total_minutes += mins
-            except Exception:
-                pass  # skip details with missing or malformed times
+            # deliberately narrow: AttributeError and NameError are always bugs
+            # and must not be swallowed here, see issue #12
+            except (ValueError, KeyError, TypeError):
+                pass  # incomplete or malformed detail, not a countable interval
 
         return f"{total_minutes // 60:02}:{total_minutes % 60:02}"
 
