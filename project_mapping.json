@@ -1,0 +1,28 @@
+{
+  "9300_2026": [
+    "#19078: ESD conformant box",
+    "Setup Raspbery Pi fwpi",
+    "Bringin up new PC",
+    "Issue #19397",
+    "MiGA: prepare 3.0 release",
+    "Refactor MiGA 3.0rc",
+    "rbphrt upgrade",
+    "NCR #19523 communication switch RBP-CAN",
+    "Issue #19397 Thermal Excursion ELMA VHP",
+    "MiGA - Event Log Parser",
+    "MiGA: hotfixes 3.0 release",
+    "MCM tickets",
+    "Rewrite CAN Master GUI",
+    "coffee tool",
+    "NCR #19523 communiction switch RBP-CAN",
+    "#19889 YLMO host twin"
+  ],
+  "Allg. Aufgaben 2026": [
+    "Meetings",
+    "Timekeeping"
+  ],
+  "9567_AQURA": [
+    "#19118 MWUBC Bias Controller Firmware",
+    "#19183 canopen-bootloader"
+  ]
+}

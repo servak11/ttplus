@@ -80,22 +80,9 @@ PROJECT_ACTIVITY_MAP = {
     "9567_AQURA": "54.10",
 }
 
-# ttplus task name -> project code. A tasks.json database records no project,
-# so the mapping is recovered from how the same task names were booked in the
-# July 2026 log. A name that is missing here stops the run rather than being
-# guessed at, so nothing lands on the wrong project.
-TASK_PROJECT_MAP = {
-    "#19078: ESD conformant box": "9300_2026",
-    "#19118 MWUBC Bias Controller Firmware": "9567_AQURA",
-    "#19183 canopen-bootloader": "9567_AQURA",
-    "Bringin up new PC": "9300_2026",
-    "Issue #19397": "9300_2026",
-    "Meetings": "Allg. Aufgaben 2026",
-    "Refactor MiGA 3.0rc": "9300_2026",
-    "Timekeeping": "Allg. Aufgaben 2026",
-    "coffee tool": "9300_2026",
-    "NCR #19523 communiction switch RBP-CAN": "9300_2026"
-}
+# TASK_PROJECT_MAP and PROJECT_TASKS come from project_mapping.json; see
+# project_mapping.py.
+from project_mapping import PROJECT_TASKS, TASK_PROJECT_MAP, assign_task
 
 # Placeholder rows entered on Thursday so the reported work percentage came
 # out right. The Friday work itself is logged under the real projects, so
@@ -924,6 +911,31 @@ def load_credentials() -> tuple[Optional[str], Optional[str]]:
     return user, password
 
 
+def prompt_for_new_tasks(entries: list[LogEntry]) -> bool:
+    """Ask for a project for every task name with no mapping yet and save the
+    answer to project_mapping.json. Returns True if anything was assigned."""
+    unmapped = find_unmapped(entries)
+    if not unmapped:
+        return False
+
+    # Projects from the mapping file first, in file order, then any project
+    # that only has an activity so far -- so the list is never empty.
+    projects = list(PROJECT_TASKS) + [p for p in PROJECT_ACTIVITY_MAP
+                                      if p not in PROJECT_TASKS]
+    for name, count in sorted(unmapped.items()):
+        print(f"\n{RED}New task:{OFF} {name!r} ({count} entries)")
+        for n, project in enumerate(projects, 1):
+            print(f"  {n} = {project}")
+        while True:
+            choice = ask("Project number: ")
+            if choice.isdigit() and 1 <= int(choice) <= len(projects):
+                break
+            print(f"  please enter a number from 1 to {len(projects)}")
+        assign_task(name, projects[int(choice) - 1])
+        print(f"  saved {name!r} -> {projects[int(choice) - 1]}")
+    return True
+
+
 def main(
     log_path: Path,
     start_date: Optional[date] = None,
@@ -973,9 +985,8 @@ def main(
         print("Skipping by request: "
               + ", ".join(d.strftime("%d.%m") for d in skipped))
 
-    # Only the entries actually in scope need a project;
-    # complain before anything is sent
-    # rather than booking them somewhere plausible.
+    # Only the entries actually in scope need a project; ask for any new task
+    # before anything is sent rather than booking it somewhere plausible.
     #
     # Meaning:
     # This is a double list comprehension that flattens the entries for all selected dates.
@@ -986,13 +997,13 @@ def main(
     #   for e in grouped[d]:    # inner cycle second
     #     in_scope.append(e)    # append operation automatically done by the list comprehension
     in_scope = [e for d in dates_to_post for e in grouped[d]]
-    unmapped = find_unmapped(in_scope)
-    if unmapped:
-        print(f"\n{RED}No project mapping for:{OFF}")
-        for name, count in sorted(unmapped.items()):
-            print(f"  {name!r} ({count} entries)")
-        print("\nAdd them to TASK_PROJECT_MAP (or IGNORED_TASKS) and re-run.")
-        return
+    if prompt_for_new_tasks(in_scope):
+        # The rows were parsed with project=None; fill in the new answers.
+        # Out-of-range rows may still be unmapped, hence get().
+        grouped = {d: [e._replace(project=TASK_PROJECT_MAP.get(e.task))
+                       if e.project is None else e
+                       for e in rows]
+                   for d, rows in grouped.items()}
 
     in_range = [d for d in emptied
                 if d >= start_date

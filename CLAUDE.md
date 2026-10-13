@@ -53,6 +53,8 @@ The application follows a Model-View-Controller (MVC) pattern with a screen-swit
 - `mod_timetrack.py` — time tracking deviation comparison
 - `mod_buchen.py` — time sheet booking
 - `mod_tt_bridge.py` — bridge to Tisoware time tracking system
+- `mod_buchungskorrektur.py` — posts Buchungskorrektur entries to Tisoware from a `tasks.json` database or markdown log
+- `project_mapping.py` / `project_mapping.json` — task name -> project code mapping for `mod_buchungskorrektur.py`. The JSON is keyed by project code, each holding a list of ttplus task names. When a task in the posting range has no mapping, the script lists the projects as numbers (1, 2, 3, ...) and saves the chosen one to the JSON. To map tasks by hand, add them to `project_mapping.json` (or to `IGNORED_TASKS` in `mod_buchungskorrektur.py`) and re-run. A new project also needs an activity in `PROJECT_ACTIVITY_MAP`.
 
 **Utilities (`util/`):**
 - `ts.py` — timestamp parsing/formatting helpers
